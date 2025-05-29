@@ -1,0 +1,40 @@
+# Build stage
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Install certificates and required tools
+RUN apk add --no-cache ca-certificates openssl curl
+
+# Update certificates
+RUN update-ca-certificates && \
+    keytool -importcert -noprompt -storepass changeit -file /etc/ssl/certs/ca-certificates.crt -alias maven -keystore $JAVA_HOME/lib/security/cacerts
+
+# Copy Maven settings and local repository
+COPY settings.xml /root/.m2/
+COPY target/fingerprint-auth-demo-backend*.jar ./fingerprint-auth-demo-backend.jar
+
+# Copy the source code
+COPY src ./src/
+
+# Build the application with SSL verification disabled
+RUN mvn clean package -DskipTests --settings /root/.m2/settings.xml
+
+# Runtime stage
+FROM eclipse-temurin:21.0.5_11-jre-alpine
+
+WORKDIR /usr/src/app
+
+# Set environment variables
+ENV JAVA_TOOL_OPTIONS="\
+  -XX:+UseParallelGC \
+  -Xss512k \
+  -XX:+UseContainerSupport \
+  -XX:MaxRAMPercentage=25"
+
+COPY target/fingerprint-auth-demo-backend*.jar ./fingerprint-auth-demo-backend.jar
+
+EXPOSE 8080
+
+CMD ["java","-jar","fingerprint-auth-demo-backend.jar"] 
