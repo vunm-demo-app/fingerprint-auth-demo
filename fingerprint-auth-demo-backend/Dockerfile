@@ -21,15 +21,20 @@ FROM eclipse-temurin:21.0.5_11-jre-alpine
 
 WORKDIR /usr/src/app
 
-# Set environment variables
-ENV JAVA_TOOL_OPTIONS="\
-  -XX:+UseParallelGC \
-  -Xss512k \
-  -XX:+UseContainerSupport \
-  -XX:MaxRAMPercentage=25"
+# Set default environment variables
+ENV PORT=8080 \
+    CORS_ALLOWED_ORIGINS=http://localhost:3000 \
+    SPRING_PROFILES_ACTIVE=prod \
+    JAVA_TOOL_OPTIONS="\
+    -XX:+UseParallelGC \
+    -Xss512k \
+    -XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=25"
 
-COPY --from=builder /usr/src/app/target/fingerprint-auth-demo-backend*.jar ./fingerprint-auth-demo-backend.jar
+COPY --from=builder /usr/src/app/target/fingerprint-auth-demo-backend*.jar ./app.jar
 
-EXPOSE 8080
+# Expose the dynamic port
+EXPOSE ${PORT}
 
-CMD ["java","-jar","fingerprint-auth-demo-backend.jar"] 
+# Start the application with environment variables
+CMD ["sh", "-c", "java -jar app.jar --server.port=${PORT} --app.cors.allowed-origins=${CORS_ALLOWED_ORIGINS}"] 

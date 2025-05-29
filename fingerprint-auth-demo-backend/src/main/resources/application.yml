@@ -1,9 +1,9 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
-    name: fingerprint-auth-demo
+    name: fingerprint-auth-demo-backend
   
   # H2 Database Configuration
   datasource:
@@ -33,7 +33,7 @@ spring:
 # Application specific configuration
 app:
   cors:
-    allowed-origins: http://localhost:3000,https://your-frontend.onrender.com
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,https://fingerprint-auth-demo.onrender.com}
   token:
     expiration: 300
     timestamp:
