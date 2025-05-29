@@ -22,6 +22,11 @@ All notable changes to this project will be documented in this file.
 - Enhanced security logging with more detailed information about suspicious activities
 - Updated logging format for better readability and debugging
 - Modified timestamp handling to use server-synchronized time
+- Improved UI/UX
+  - Restored trading interface as main demo page
+  - Removed admin route from navigation
+  - Made admin dashboard accessible only via direct URL
+  - Enhanced layout and styling
 
 ### Security
 - Added detailed logging for security-related events
@@ -30,6 +35,7 @@ All notable changes to this project will be documented in this file.
   - Rate limiting information
   - Token validation failures
 - Improved timestamp validation accuracy through server synchronization
+- Enhanced admin access security by hiding admin route from UI
 
 ## [0.0.3] - Previous Release
 
