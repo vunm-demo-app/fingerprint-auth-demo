@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: fingerprint-auth-demo-backend
+      dockerfile: docker/Dockerfile.local
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - app-network
+
+  frontend:
+    build: fingerprint-auth-demo-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+secrets:
+  fortigate_cert:
+    file: ./certs/FortiGate_CA.crt 
