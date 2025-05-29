@@ -17,7 +17,6 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class TokenController {
     private final TokenService tokenService;
 

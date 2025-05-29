@@ -32,6 +32,8 @@ spring:
 
 # Application specific configuration
 app:
+  cors:
+    allowed-origins: http://localhost:3000,https://your-frontend.onrender.com
   token:
     expiration: 300
     timestamp:
