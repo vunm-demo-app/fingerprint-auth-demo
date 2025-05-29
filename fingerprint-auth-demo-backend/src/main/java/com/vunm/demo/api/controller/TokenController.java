@@ -3,6 +3,7 @@ package com.vunm.demo.api.controller;
 import com.vunm.demo.domain.model.AppToken;
 import com.vunm.demo.api.dto.AppTokenRequestWithComponents;
 import com.vunm.demo.domain.service.TokenService;
+import com.vunm.demo.util.IpAddressUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,14 +20,17 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class TokenController {
     private final TokenService tokenService;
+    private final IpAddressUtil ipAddressUtil;
 
     @PostMapping("/app-token")
     public ResponseEntity<AppToken> getToken(
             @RequestBody AppTokenRequestWithComponents request,
             HttpServletRequest servletRequest) {
         
-        String clientIp = servletRequest.getRemoteAddr();
+        String clientIp = ipAddressUtil.getClientIp(servletRequest);
         String userAgent = servletRequest.getHeader("User-Agent");
+
+        log.debug("Processing token request - IP: {}, User-Agent: {}", clientIp, userAgent);
 
         return tokenService.generateTokenIfValid(
                 request,

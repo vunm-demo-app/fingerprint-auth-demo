@@ -3,6 +3,7 @@ package com.vunm.demo.domain.service;
 import com.vunm.demo.domain.model.AppToken;
 import com.vunm.demo.api.dto.AppTokenRequestWithComponents;
 import com.vunm.demo.domain.model.RequestLog;
+import com.vunm.demo.util.IpAddressUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -24,6 +25,7 @@ public class TokenService {
     private final SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
     private final RequestLogService requestLogService;
     private final FingerprintVerificationService fingerprintVerificationService;
+    private final IpAddressUtil ipAddressUtil;
     private final Map<String, Set<String>> fingerprintToIps = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> ipToFingerprints = new ConcurrentHashMap<>();
     private final Map<String, Integer> requestCounts = new ConcurrentHashMap<>();
@@ -53,12 +55,20 @@ public class TokenService {
     private long failedAttemptWindowSeconds;
 
     public TokenService(RequestLogService requestLogService, 
-                       FingerprintVerificationService fingerprintVerificationService) {
+                       FingerprintVerificationService fingerprintVerificationService,
+                       IpAddressUtil ipAddressUtil) {
         this.requestLogService = requestLogService;
         this.fingerprintVerificationService = fingerprintVerificationService;
+        this.ipAddressUtil = ipAddressUtil;
     }
 
     private boolean isIpFingerprintSuspicious(String fingerprint, String ipAddress) {
+        // If the IP is from Cloudflare, we don't consider it suspicious
+        if (ipAddressUtil.isCloudflareIp(ipAddress)) {
+            log.debug("Skipping IP-Fingerprint correlation check for Cloudflare IP: {}", ipAddress);
+            return false;
+        }
+
         // Track IP to fingerprint mapping
         fingerprintToIps.computeIfAbsent(fingerprint, k -> ConcurrentHashMap.newKeySet()).add(ipAddress);
         ipToFingerprints.computeIfAbsent(ipAddress, k -> ConcurrentHashMap.newKeySet()).add(fingerprint);
