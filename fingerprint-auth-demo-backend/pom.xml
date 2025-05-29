@@ -13,7 +13,7 @@
 
     <groupId>com.vunm.demo</groupId>
     <artifactId>fingerprint-auth-demo-backend</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.4</version>
     <name>fingerprint-auth-demo-backend</name>
     <description>Demo project for FingerprintJS protection</description>
 

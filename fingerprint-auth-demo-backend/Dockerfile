@@ -4,17 +4,19 @@ FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy pom.xml first for layer caching
-COPY pom.xml ./
+# Cache Maven dependencies
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
 
-# Download dependencies
-RUN mvn dependency:go-offline --quiet
+# Cache local Maven repository
+RUN mkdir -p /root/.m2/repository
+VOLUME /root/.m2/repository
 
-# Copy the source code after caching dependencies
+# Copy the source code
 COPY src ./src/
 
-# Build the application
-RUN mvn clean package -DskipTests --quiet
+# Build the application with cached dependencies
+RUN mvn clean package -DskipTests -B
 
 # Final runtime image
 FROM eclipse-temurin:21.0.5_11-jre-alpine

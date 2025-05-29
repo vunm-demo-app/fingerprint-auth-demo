@@ -34,7 +34,7 @@ public class TokenService {
     @Value("${app.token.expiration:300}") // 5 minutes default
     private long tokenExpirationSeconds;
 
-    @Value("${app.token.timestamp.tolerance:30}") // 30 seconds tolerance
+    @Value("${app.token.timestamp.tolerance:60}") // 60 seconds tolerance (1 minute)
     private long timestampToleranceSeconds;
 
     @Value("${app.rate.limit.window:3600}") // 1 hour window
@@ -126,28 +126,32 @@ public class TokenService {
 
         // 0. Check failed attempts
         if (hasTooManyFailedAttempts(request.getFingerprint())) {
-            log.warn("Too many failed attempts for fingerprint: {}", request.getFingerprint());
+            log.warn("Too many failed attempts for fingerprint: {}, IP: {}, User-Agent: {}", 
+                request.getFingerprint(), clientIp, userAgent);
             logFailedRequest(request, clientIp, userAgent, "Too many failed attempts", false);
             return Optional.empty();
         }
 
         // 1. Verify fingerprint components
         if (!fingerprintVerificationService.verifyFingerprint(request.getFingerprint(), fingerprintComponents)) {
-            log.warn("Invalid fingerprint detected");
+            log.warn("Invalid fingerprint detected - IP: {}, User-Agent: {}, DeviceId: {}, Components: {}", 
+                clientIp, userAgent, request.getDeviceId(), fingerprintComponents);
             logFailedRequest(request, clientIp, userAgent, "Invalid fingerprint", false);
             return Optional.empty();
         }
 
         // 2. Check IP-Fingerprint correlation
         if (isIpFingerprintSuspicious(request.getFingerprint(), clientIp)) {
-            log.warn("Suspicious IP-Fingerprint correlation detected");
+            log.warn("Suspicious IP-Fingerprint correlation - IP: {}, Fingerprint: {}, User-Agent: {}, DeviceId: {}", 
+                clientIp, request.getFingerprint(), userAgent, request.getDeviceId());
             logFailedRequest(request, clientIp, userAgent, "Suspicious IP-Fingerprint correlation", true);
             return Optional.empty();
         }
 
         // 3. Check rate limiting
         if (isRateLimited(request.getFingerprint())) {
-            log.warn("Rate limit exceeded for fingerprint: {}", request.getFingerprint());
+            log.warn("Rate limit exceeded - IP: {}, Fingerprint: {}, User-Agent: {}, DeviceId: {}", 
+                clientIp, request.getFingerprint(), userAgent, request.getDeviceId());
             logFailedRequest(request, clientIp, userAgent, "Rate limit exceeded", true);
             return Optional.empty();
         }
@@ -155,10 +159,14 @@ public class TokenService {
         // 4. Validate timestamp
         long now = Instant.now().getEpochSecond();
         if (Math.abs(now - request.getTimestamp()) > timestampToleranceSeconds) {
-            log.warn("Invalid timestamp. Request time: {}, Current time: {}", request.getTimestamp(), now);
+            log.warn("Invalid timestamp - IP: {}, Request time: {}, Current time: {}, Difference: {} seconds", 
+                clientIp, request.getTimestamp(), now, Math.abs(now - request.getTimestamp()));
             logFailedRequest(request, clientIp, userAgent, "Invalid timestamp", false);
             return Optional.empty();
         }
+
+        log.info("Generating token - IP: {}, Fingerprint: {}, DeviceId: {}, User-Agent: {}, Timestamp: {}", 
+            clientIp, request.getFingerprint(), request.getDeviceId(), userAgent, now);
 
         // 5. Generate token
         long expirationTime = now + tokenExpirationSeconds;
@@ -209,22 +217,40 @@ public class TokenService {
 
     public boolean validateToken(String token, String fingerprint) {
         try {
+            log.debug("Validating token for fingerprint: {}", fingerprint);
+            
             Claims claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
 
-            boolean isValid = claims.getSubject().equals(fingerprint) &&
-                            claims.getExpiration().after(new Date());
+            boolean subjectValid = claims.getSubject().equals(fingerprint);
+            boolean notExpired = claims.getExpiration().after(new Date());
+            
+            if (!subjectValid) {
+                log.warn("Token validation failed - Subject mismatch. Expected: {}, Found: {}", 
+                    fingerprint, claims.getSubject());
+            }
+            
+            if (!notExpired) {
+                log.warn("Token validation failed - Token expired. Expiration: {}, Current time: {}", 
+                    claims.getExpiration(), new Date());
+            }
+
+            boolean isValid = subjectValid && notExpired;
 
             if (!isValid) {
                 recordFailedAttempt(fingerprint);
+                log.warn("Token validation failed for fingerprint: {}. IP: {}, User-Agent: {}", 
+                    fingerprint, claims.get("ip"), claims.get("userAgent"));
+            } else {
+                log.debug("Token successfully validated for fingerprint: {}", fingerprint);
             }
 
             return isValid;
         } catch (Exception e) {
-            log.error("Token validation error: {}", e.getMessage());
+            log.error("Token validation error for fingerprint: {}: {}", fingerprint, e.getMessage());
             recordFailedAttempt(fingerprint);
             return false;
         }
