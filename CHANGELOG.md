@@ -11,12 +11,17 @@ All notable changes to this project will be documented in this file.
   - Added Device ID logging
   - Added component information in fingerprint validation logs
   - Added timestamp validation details with time differences
-- Increased timestamp tolerance to 60 seconds (1 minute) for better handling of time synchronization issues
+- Increased timestamp tolerance to 120 seconds (2 minutes) for better handling of time synchronization issues
+- Added server time synchronization feature
+  - New `/api/time` endpoint to provide server time
+  - Client-side time difference calculation and adjustment
+  - Automatic timestamp synchronization for all requests
 
 ### Changed
 - Improved token validation logging with specific failure reasons
 - Enhanced security logging with more detailed information about suspicious activities
 - Updated logging format for better readability and debugging
+- Modified timestamp handling to use server-synchronized time
 
 ### Security
 - Added detailed logging for security-related events
@@ -24,6 +29,7 @@ All notable changes to this project will be documented in this file.
   - IP-Fingerprint correlation analysis
   - Rate limiting information
   - Token validation failures
+- Improved timestamp validation accuracy through server synchronization
 
 ## [0.0.3] - Previous Release
 

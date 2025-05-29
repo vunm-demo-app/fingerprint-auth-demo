@@ -54,6 +54,7 @@ class ApiService {
     private fingerprintComponents: Record<string, any> | null = null;
     private initPromise: Promise<void> | null = null;
     private fpResult: GetResult | null = null;
+    private serverTimeDiff: number = 0;
 
     constructor() {
         // Try to restore fingerprint from localStorage
@@ -73,15 +74,36 @@ class ApiService {
         this.initPromise = this.initialize();
     }
 
+    private async getServerTime(): Promise<number> {
+        try {
+            const response = await api.get<{ serverTime: number }>('/time');
+            const serverTime = response.data.serverTime;
+            const localTime = Math.floor(Date.now() / 1000);
+            this.serverTimeDiff = serverTime - localTime;
+            console.log('Server time difference:', this.serverTimeDiff, 'seconds');
+            return serverTime;
+        } catch (error) {
+            console.error('Failed to get server time:', error);
+            return Math.floor(Date.now() / 1000);
+        }
+    }
+
+    private getCurrentTimestamp(): number {
+        return Math.floor(Date.now() / 1000) + this.serverTimeDiff;
+    }
+
     private async initialize(): Promise<void> {
         try {
+            // Get server time first
+            await this.getServerTime();
+
             const { visitorId, components } = await this.getFingerprint();
             const deviceId = this.generateDeviceId();
             
             const request: AppTokenRequest = {
                 deviceId,
                 fingerprint: visitorId,
-                timestamp: Math.floor(Date.now() / 1000),
+                timestamp: this.getCurrentTimestamp(),
                 components
             };
 
@@ -211,7 +233,7 @@ class ApiService {
             const request: AppTokenRequest = {
                 deviceId,
                 fingerprint: visitorId,
-                timestamp: Math.floor(Date.now() / 1000),
+                timestamp: this.getCurrentTimestamp(),
                 components
             };
 

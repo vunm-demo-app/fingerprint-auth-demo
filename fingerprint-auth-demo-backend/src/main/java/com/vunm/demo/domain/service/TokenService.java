@@ -34,7 +34,7 @@ public class TokenService {
     @Value("${app.token.expiration:300}") // 5 minutes default
     private long tokenExpirationSeconds;
 
-    @Value("${app.token.timestamp.tolerance:60}") // 60 seconds tolerance (1 minute)
+    @Value("${app.token.timestamp.tolerance:120}") // 120 seconds tolerance (2 minutes)
     private long timestampToleranceSeconds;
 
     @Value("${app.rate.limit.window:3600}") // 1 hour window
