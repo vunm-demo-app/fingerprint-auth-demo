@@ -1,5 +1,5 @@
 import axios from 'axios';
-import FingerprintJS, { Agent, GetResult } from '@fingerprintjs/fingerprintjs';
+import FingerprintJS, { GetResult } from '@fingerprintjs/fingerprintjs';
 import SHA256 from 'crypto-js/sha256';
 
 const fpPromise = FingerprintJS.load();

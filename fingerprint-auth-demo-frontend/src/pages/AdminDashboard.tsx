@@ -137,7 +137,11 @@ const AdminDashboard: React.FC = () => {
                 <Card title="Date Range">
                     <RangePicker
                         value={dateRange}
-                        onChange={(dates) => dates && setDateRange(dates)}
+                        onChange={(dates) => {
+                            if (dates && dates[0] && dates[1]) {
+                                setDateRange([dates[0], dates[1]]);
+                            }
+                        }}
                         showTime
                     />
                 </Card>
