@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-05-30
+
+### Added
+- Added Go backend implementation with Gin framework
+  - Created SQLite database integration with pure Go driver
+  - Implemented all API endpoints from Java version
+  - Added middleware for authentication and CORS
+  - Created services for fingerprint verification and token management
+  - Added Docker configuration for Go backend
+
+### Changed
+- Updated docker-compose.yml to use Go backend instead of Java
+- Updated render.yaml for deployment with Go backend
+- Improved performance with lightweight Go implementation
+- Reduced resource usage for better deployment on free tier services
+
 ## [0.1.0] - 2025-05-30
 
 ### Added

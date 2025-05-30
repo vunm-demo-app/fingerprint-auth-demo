@@ -3,28 +3,33 @@ version: '3.8'
 services:
   backend:
     build:
-      context: fingerprint-auth-demo-backend
-      dockerfile: docker/Dockerfile.local
+      context: ./fingerprint-auth-demo-backend-go
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-    networks:
-      - app-network
+      - PORT=8080
+      - GIN_MODE=release
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,https://fingerprint-auth-demo.onrender.com
+      - FINGERPRINT_API_KEY=${FINGERPRINT_API_KEY}
+      - FINGERPRINT_API_URL=https://api.fpjs.io
+      - FINGERPRINT_API_REGION=us
+    volumes:
+      - backend-data:/app/data
+    restart: unless-stopped
 
   frontend:
-    build: fingerprint-auth-demo-frontend
+    build:
+      context: ./fingerprint-auth-demo-frontend
+      dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080/api
+      - VITE_FINGERPRINT_PUBLIC_API_KEY=${VITE_FINGERPRINT_PUBLIC_API_KEY}
     depends_on:
       - backend
-    networks:
-      - app-network
+    restart: unless-stopped
 
-networks:
-  app-network:
-    driver: bridge
-
-secrets:
-  fortigate_cert:
-    file: ./certs/FortiGate_CA.crt 
+volumes:
+  backend-data:

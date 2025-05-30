@@ -2,17 +2,36 @@ services:
   - type: web
     name: fingerprint-auth-demo-backend
     env: docker
-    rootDir: fingerprint-auth-demo-backend
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    plan: starter
-    branch: main
-    numInstances: 1
-    healthCheckPath: /api/health
+    dockerfilePath: ./fingerprint-auth-demo-backend-go/Dockerfile
+    dockerContext: ./fingerprint-auth-demo-backend-go
+    plan: free
+    healthCheckPath: /health
     envVars:
+      - key: PORT
+        value: 8080
+      - key: GIN_MODE
+        value: release
       - key: CORS_ALLOWED_ORIGINS
-        value: https://fingerprint-auth-demo-frontend.onrender.com
+        value: https://fingerprint-auth-demo.onrender.com
+      - key: FINGERPRINT_API_KEY
+        sync: false
+      - key: FINGERPRINT_API_URL
+        value: https://api.fpjs.io
+      - key: FINGERPRINT_API_REGION
+        value: us
     disk:
-      name: maven-cache
-      mountPath: /root/.m2/repository
-      sizeGB: 1 
+      name: data
+      mountPath: /app/data
+      sizeGB: 1
+
+  - type: web
+    name: fingerprint-auth-demo-frontend
+    env: docker
+    dockerfilePath: ./fingerprint-auth-demo-frontend/Dockerfile
+    dockerContext: ./fingerprint-auth-demo-frontend
+    plan: free
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://fingerprint-auth-demo-backend.onrender.com/api
+      - key: VITE_FINGERPRINT_PUBLIC_API_KEY
+        sync: false
