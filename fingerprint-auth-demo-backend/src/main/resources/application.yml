@@ -42,5 +42,7 @@ app:
     limit:
       window: 3600
       max: 100
-  security:
-    max-ips-per-fingerprint: 3 
+  fingerprint:
+    api-key: ${FINGERPRINT_API_KEY:}
+    api-url: ${FINGERPRINT_API_URL:https://api.fpjs.io}
+    api-region: ${FINGERPRINT_API_REGION:us}

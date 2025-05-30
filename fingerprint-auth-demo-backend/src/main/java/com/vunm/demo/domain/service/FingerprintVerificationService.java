@@ -17,6 +17,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class FingerprintVerificationService {
     private final FingerprintDetailsRepository fingerprintDetailsRepository;
+    private final FingerprintApiService fingerprintApiService;
     private final ObjectMapper objectMapper;
 
     public boolean verifyFingerprint(String fingerprint, Map<String, Object> components) {
@@ -30,26 +31,43 @@ public class FingerprintVerificationService {
             log.info("Verifying fingerprint: {}", fingerprint);
             log.debug("Received components: {}", components);
 
-            // 2. Extract components
+            // 2. Check with FingerprintJS Pro API for bot detection
+            Map<String, Object> visitorInfo = fingerprintApiService.getVisitorInfo(fingerprint);
+            
+            // 3. If API indicates this is a bot with high confidence, reject immediately
+            if (visitorInfo.containsKey("isBot") && (Boolean)visitorInfo.get("isBot")) {
+                log.warn("FingerprintJS Pro API identified visitor as bot: {}", fingerprint);
+                log.warn("Bot type: {}, probability: {}", 
+                    visitorInfo.get("botType"), visitorInfo.get("botProbability"));
+                return false;
+            }
+            
+            // 4. Merge API data with components
+            if (!visitorInfo.isEmpty()) {
+                components.putAll(visitorInfo);
+                log.debug("Enhanced components with API data: {}", visitorInfo.keySet());
+            }
+
+            // 5. Extract components
             FingerprintDetails details = buildFingerprintDetails(fingerprint, components);
             log.debug("Built fingerprint details: {}", details);
             
-            // 3. Check if fingerprint exists
+            // 6. Check if fingerprint exists
             Optional<FingerprintDetails> existingDetails = fingerprintDetailsRepository.findByFingerprint(fingerprint);
             
             if (existingDetails.isPresent()) {
                 log.info("Found existing fingerprint, verifying consistency");
-                // 4. Verify consistency with existing fingerprint
+                // 7. Verify consistency with existing fingerprint
                 return verifyConsistency(existingDetails.get(), details);
             } else {
                 log.info("New fingerprint detected, checking for suspicious patterns");
-                // 5. Check for suspicious patterns in new fingerprint
+                // 8. Check for suspicious patterns in new fingerprint
                 if (isSuspiciousFingerprint(details)) {
                     log.warn("Suspicious pattern detected for new fingerprint: {}", fingerprint);
                     return false;
                 }
                 
-                // 6. Save new fingerprint
+                // 9. Save new fingerprint
                 log.info("Saving new fingerprint: {}", fingerprint);
                 details.setFirstSeenAt(System.currentTimeMillis());
                 details.setConsistencyScore(100);
@@ -63,6 +81,37 @@ public class FingerprintVerificationService {
     }
 
     private FingerprintDetails buildFingerprintDetails(String fingerprint, Map<String, Object> components) throws JsonProcessingException {
+        // Extract bot detection data from components if available
+        Double botProbability = null;
+        String botType = null;
+        Boolean isBot = null;
+        
+        if (components.containsKey("botProbability")) {
+            Object probObj = components.get("botProbability");
+            if (probObj instanceof Number) {
+                botProbability = ((Number) probObj).doubleValue();
+            } else if (probObj instanceof String) {
+                try {
+                    botProbability = Double.parseDouble((String) probObj);
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid botProbability format: {}", probObj);
+                }
+            }
+        }
+        
+        if (components.containsKey("botType")) {
+            botType = getStringValue(components, "botType");
+        }
+        
+        if (components.containsKey("isBot")) {
+            Object isBotObj = components.get("isBot");
+            if (isBotObj instanceof Boolean) {
+                isBot = (Boolean) isBotObj;
+            } else if (isBotObj instanceof String) {
+                isBot = Boolean.parseBoolean((String) isBotObj);
+            }
+        }
+        
         return FingerprintDetails.builder()
             .fingerprint(fingerprint)
             .components(objectMapper.writeValueAsString(components))
@@ -83,6 +132,9 @@ public class FingerprintVerificationService {
             .fonts(getStringValue(components, "fonts"))
             .audio(getStringValue(components, "audio"))
             .canvas(getStringValue(components, "canvas"))
+            .botProbability(botProbability)
+            .botType(botType)
+            .isBot(isBot)
             .lastSeenAt(System.currentTimeMillis())
             .build();
     }
@@ -91,7 +143,29 @@ public class FingerprintVerificationService {
         // 1. Update last seen timestamp
         existing.setLastSeenAt(System.currentTimeMillis());
         
-        // 2. Check for critical components that should never change
+        // 2. Update bot detection data if available
+        if (current.getBotProbability() != null) {
+            existing.setBotProbability(current.getBotProbability());
+        }
+        
+        if (current.getBotType() != null) {
+            existing.setBotType(current.getBotType());
+        }
+        
+        if (current.getIsBot() != null) {
+            existing.setIsBot(current.getIsBot());
+        }
+        
+        // 3. If marked as bot by the API, reject
+        if (Boolean.TRUE.equals(existing.getIsBot())) {
+            log.warn("Fingerprint marked as bot: {}, type: {}, probability: {}", 
+                existing.getFingerprint(), existing.getBotType(), existing.getBotProbability());
+            existing.setConsistencyScore(Math.max(0, existing.getConsistencyScore() - 50));
+            fingerprintDetailsRepository.save(existing);
+            return false;
+        }
+        
+        // 4. Check for critical components that should never change
         log.debug("Comparing critical components for fingerprint: {}", existing.getFingerprint());
         log.debug("Existing canvas: {}, Current canvas: {}", existing.getCanvas(), current.getCanvas());
         log.debug("Existing audio: {}, Current audio: {}", existing.getAudio(), current.getAudio());
@@ -107,7 +181,7 @@ public class FingerprintVerificationService {
             return false;
         }
 
-        // 3. Check for components that rarely change
+        // 5. Check for components that rarely change
         log.debug("Checking rarely changing components");
         int changes = 0;
         if (!existing.getWebglRenderer().equals(current.getWebglRenderer())) {
@@ -142,7 +216,7 @@ public class FingerprintVerificationService {
             return false;
         }
 
-        // 4. Update consistency score
+        // 6. Update consistency score
         log.debug("Updating consistency score. Current: {}", existing.getConsistencyScore());
         existing.setConsistencyScore(Math.min(100, existing.getConsistencyScore() + 1));
         fingerprintDetailsRepository.save(existing);
@@ -151,7 +225,14 @@ public class FingerprintVerificationService {
     }
 
     private boolean isSuspiciousFingerprint(FingerprintDetails details) {
-        // 1. Check for similar fingerprints with same environment
+        // 1. If marked as bot by the API with high probability, consider suspicious
+        if (details.getBotProbability() != null && details.getBotProbability() > 0.7) {
+            log.warn("High bot probability detected: {}, type: {}", 
+                details.getBotProbability(), details.getBotType());
+            return true;
+        }
+        
+        // 2. Check for similar fingerprints with same environment
         List<FingerprintDetails> similarFingerprints = fingerprintDetailsRepository.findSimilarFingerprints(
             details.getFingerprint(),
             details.getUserAgent(),
@@ -166,7 +247,7 @@ public class FingerprintVerificationService {
             return true;
         }
 
-        // 2. Check for canvas/audio fingerprint reuse
+        // 3. Check for canvas/audio fingerprint reuse
         List<FingerprintDetails> matchingFingerprints = fingerprintDetailsRepository
             .findByCanvasOrAudioFingerprint(details.getCanvas(), details.getAudio());
 
@@ -175,7 +256,7 @@ public class FingerprintVerificationService {
             return true;
         }
 
-        // 3. Check for bot patterns
+        // 4. Check for bot patterns
         if (isBotPattern(details)) {
             log.warn("Bot pattern detected in fingerprint components");
             return true;
@@ -246,4 +327,4 @@ public class FingerprintVerificationService {
         Object value = map.get(key);
         return value instanceof Boolean ? (Boolean) value : false;
     }
-} 
+}

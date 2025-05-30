@@ -26,8 +26,6 @@ public class TokenService {
     private final RequestLogService requestLogService;
     private final FingerprintVerificationService fingerprintVerificationService;
     private final IpAddressUtil ipAddressUtil;
-    private final Map<String, Set<String>> fingerprintToIps = new ConcurrentHashMap<>();
-    private final Map<String, Set<String>> ipToFingerprints = new ConcurrentHashMap<>();
     private final Map<String, Integer> requestCounts = new ConcurrentHashMap<>();
     private final Map<String, Long> lastRequestTimes = new ConcurrentHashMap<>();
     private final Map<String, Integer> failedAttempts = new ConcurrentHashMap<>();
@@ -45,9 +43,6 @@ public class TokenService {
     @Value("${app.rate.limit.max:100}") // max 100 requests per window
     private long maxRequestsPerWindow;
 
-    @Value("${app.security.max-ips-per-fingerprint:3}")
-    private int maxIpsPerFingerprint;
-
     @Value("${app.security.max-failed-attempts:5}")
     private int maxFailedAttempts;
 
@@ -60,34 +55,6 @@ public class TokenService {
         this.requestLogService = requestLogService;
         this.fingerprintVerificationService = fingerprintVerificationService;
         this.ipAddressUtil = ipAddressUtil;
-    }
-
-    private boolean isIpFingerprintSuspicious(String fingerprint, String ipAddress) {
-        // If the IP is from Cloudflare, we don't consider it suspicious
-        if (ipAddressUtil.isCloudflareIp(ipAddress)) {
-            log.debug("Skipping IP-Fingerprint correlation check for Cloudflare IP: {}", ipAddress);
-            return false;
-        }
-
-        // Track IP to fingerprint mapping
-        fingerprintToIps.computeIfAbsent(fingerprint, k -> ConcurrentHashMap.newKeySet()).add(ipAddress);
-        ipToFingerprints.computeIfAbsent(ipAddress, k -> ConcurrentHashMap.newKeySet()).add(fingerprint);
-
-        // Check if fingerprint is used from too many IPs
-        if (fingerprintToIps.get(fingerprint).size() > maxIpsPerFingerprint) {
-            log.warn("Suspicious activity: Fingerprint {} used from too many IPs ({})", 
-                    fingerprint, fingerprintToIps.get(fingerprint).size());
-            return true;
-        }
-
-        // Check if IP is using too many fingerprints
-        if (ipToFingerprints.get(ipAddress).size() > maxIpsPerFingerprint) {
-            log.warn("Suspicious activity: IP {} used too many fingerprints ({})", 
-                    ipAddress, ipToFingerprints.get(ipAddress).size());
-            return true;
-        }
-
-        return false;
     }
 
     private boolean isRateLimited(String fingerprint) {
@@ -150,15 +117,7 @@ public class TokenService {
             return Optional.empty();
         }
 
-        // 2. Check IP-Fingerprint correlation
-        if (isIpFingerprintSuspicious(request.getFingerprint(), clientIp)) {
-            log.warn("Suspicious IP-Fingerprint correlation - IP: {}, Fingerprint: {}, User-Agent: {}, DeviceId: {}", 
-                clientIp, request.getFingerprint(), userAgent, request.getDeviceId());
-            logFailedRequest(request, clientIp, userAgent, "Suspicious IP-Fingerprint correlation", true);
-            return Optional.empty();
-        }
-
-        // 3. Check rate limiting
+        // 2. Check rate limiting
         if (isRateLimited(request.getFingerprint())) {
             log.warn("Rate limit exceeded - IP: {}, Fingerprint: {}, User-Agent: {}, DeviceId: {}", 
                 clientIp, request.getFingerprint(), userAgent, request.getDeviceId());
@@ -166,7 +125,7 @@ public class TokenService {
             return Optional.empty();
         }
 
-        // 4. Validate timestamp
+        // 3. Validate timestamp
         long now = Instant.now().getEpochSecond();
         if (Math.abs(now - request.getTimestamp()) > timestampToleranceSeconds) {
             log.warn("Invalid timestamp - IP: {}, Request time: {}, Current time: {}, Difference: {} seconds", 
@@ -178,7 +137,7 @@ public class TokenService {
         log.info("Generating token - IP: {}, Fingerprint: {}, DeviceId: {}, User-Agent: {}, Timestamp: {}", 
             clientIp, request.getFingerprint(), request.getDeviceId(), userAgent, now);
 
-        // 5. Generate token
+        // 4. Generate token
         long expirationTime = now + tokenExpirationSeconds;
         String token = Jwts.builder()
                 .subject(request.getFingerprint())
@@ -190,7 +149,7 @@ public class TokenService {
                 .signWith(key)
                 .compact();
 
-        // 6. Log successful request
+        // 5. Log successful request
         RequestLog successLog = RequestLog.builder()
             .fingerprint(request.getFingerprint())
             .deviceId(request.getDeviceId())
@@ -265,4 +224,4 @@ public class TokenService {
             return false;
         }
     }
-} 
+}

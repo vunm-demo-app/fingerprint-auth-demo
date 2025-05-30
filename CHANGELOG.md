@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0] - 2025-05-30
+
+### Added
+- Upgraded to FingerprintJS Pro from free version
+  - Added server-side bot detection using FingerprintJS Pro API
+  - Integrated bot probability and type detection
+  - Added bot detection fields to FingerprintDetails model
+- Created FingerprintApiService for interacting with FingerprintJS Pro API
+- Added FingerprintConfig for API configuration
+- Added environment variables support for FingerprintJS Pro API
+- Enhanced TypeScript types for FingerprintJS Pro integration
+
+### Changed
+- Updated frontend to use FingerprintJS Pro client SDK
+- Modified FingerprintVerificationService to use FingerprintJS Pro API
+- Removed IP-to-fingerprint correlation checks (replaced by Pro bot detection)
+- Updated TokenService to rely on FingerprintJS Pro bot detection
+- Improved error handling and null safety in TypeScript code
+- Updated documentation with FingerprintJS Pro setup instructions
+
+### Security
+- Enhanced bot detection with professional-grade FingerprintJS Pro
+- Improved accuracy of bot identification with server-side verification
+- Added bot probability scoring for more nuanced bot handling
+
 ## [0.0.4] - 2024-03-21
 
 ### Added

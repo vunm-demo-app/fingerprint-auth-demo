@@ -1,8 +1,11 @@
 import axios from 'axios';
-import FingerprintJS, { GetResult } from '@fingerprintjs/fingerprintjs';
+import FingerprintJS from '@fingerprintjs/fingerprintjs-pro';
 import SHA256 from 'crypto-js/sha256';
 
-const fpPromise = FingerprintJS.load();
+// Use the Pro version with the public API key
+const fpPromise = FingerprintJS.load({ 
+  apiKey: import.meta.env.VITE_FINGERPRINT_PUBLIC_API_KEY || 'zThPOeeB10e17zhjQbbh'
+});
 
 interface AppToken {
     token: string;
@@ -38,6 +41,28 @@ interface AdminLogParams {
     size?: number;
 }
 
+// Define the structure of the FingerprintJS Pro result
+interface ExtendedGetResult {
+    visitorId: string;
+    requestId?: string;
+    products?: {
+        identification?: {
+            data?: {
+                visitorId?: string;
+                components?: Record<string, any>;
+            }
+        },
+        botd?: {
+            data?: {
+                bot?: {
+                    probability: number;
+                    type: string;
+                }
+            }
+        }
+    }
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
 const api = axios.create({
@@ -53,7 +78,7 @@ class ApiService {
     private deviceId: string | null = null;
     private fingerprintComponents: Record<string, any> | null = null;
     private initPromise: Promise<void> | null = null;
-    private fpResult: GetResult | null = null;
+    private fpResult: ExtendedGetResult | null = null;
     private serverTimeDiff: number = 0;
 
     constructor() {
@@ -158,21 +183,29 @@ class ApiService {
         }
         
         const fp = await fpPromise;
-        this.fpResult = await fp.get();
+        this.fpResult = await fp.get() as ExtendedGetResult;
         
-        this.fingerprint = this.fpResult.visitorId;
-        console.log('Raw fingerprint components:', this.fpResult.components);
+        // Ensure fingerprint is always a string
+        this.fingerprint = this.fpResult.visitorId || '';
+        console.log('Raw fingerprint result:', this.fpResult);
+
+        // With Pro version, we get additional bot detection information
+        const botProbability = this.fpResult?.products?.botd?.data?.bot?.probability || 0;
+        const botType = this.fpResult?.products?.botd?.data?.bot?.type || 'unknown';
+        
+        console.log('Bot detection:', { probability: botProbability, type: botType });
 
         // Get WebGL info safely
-        const webglInfo = (this.fpResult.components as any).webgl || {};
+        const components = this.fpResult?.products?.identification?.data?.components || {};
+        const webglInfo = (components as any)?.webgl || {};
         const webglSupported = !!webglInfo;
         const webglRenderer = webglInfo.renderer || '';
         const webglVendor = webglInfo.vendor || '';
-
-        // Hash critical components first for debugging
-        const fontsHash = this.hashComponent(this.fpResult.components.fonts);
-        const audioHash = this.hashComponent(this.fpResult.components.audio);
-        const canvasHash = this.hashComponent(this.fpResult.components.canvas);
+        
+        // Hash critical components for debugging
+        const fontsHash = this.hashComponent(components.fonts);
+        const audioHash = this.hashComponent(components.audio);
+        const canvasHash = this.hashComponent(components.canvas);
         
         console.log('Hashed components:', {
             fonts: fontsHash,
@@ -197,7 +230,10 @@ class ApiService {
             pixelRatio: window.devicePixelRatio?.toString() || '',
             fonts: fontsHash,
             audio: audioHash,
-            canvas: canvasHash
+            canvas: canvasHash,
+            // Add bot detection data from Pro version
+            botProbability: botProbability.toString(),
+            botType: botType
         };
 
         // Store fingerprint in localStorage
@@ -306,4 +342,4 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
-export type { StockPrice, AppToken, AppTokenRequest }; 
+export type { StockPrice, AppToken, AppTokenRequest };
