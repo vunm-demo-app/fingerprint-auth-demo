@@ -55,6 +55,10 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
         });
     };
 
+    const formatConfidenceScore = (score: number) => {
+        return `${(score * 100).toFixed(1)}%`;
+    };
+
     // Log để debug
     console.log('VisitorInfo components:', components);
 
@@ -85,10 +89,10 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                     </Space>
                 }>
                     <Space direction="vertical" size="small">
-                        <Text>IP: {components?.ipInfo?.ip || 'N/A'}</Text>
-                        <Text>Trình duyệt: {components?.browserDetails?.name || 'N/A'} {components?.browserDetails?.version || ''}</Text>
-                        <Text>Hệ điều hành: {components?.osDetails?.name || 'N/A'} {components?.osDetails?.version || ''}</Text>
-                        <Text>Thiết bị: {components?.deviceDetails?.type || 'N/A'}</Text>
+                        <Text>IP: {components?.ip || 'N/A'}</Text>
+                        <Text>Trình duyệt: {components?.browserName || 'N/A'} {components?.browserVersion || ''}</Text>
+                        <Text>Hệ điều hành: {components?.os || 'N/A'} {components?.osVersion || ''}</Text>
+                        <Text>Thiết bị: {components?.device || 'N/A'}</Text>
                         <Text>Chế độ ẩn danh: {components?.incognito ? 'Có' : 'Không'}</Text>
                     </Space>
                 </Descriptions.Item>
@@ -112,8 +116,8 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                     </Space>
                 }>
                     <Space direction="vertical" size="small">
-                        <Text>Phiên bản: {components?.meta?.version || 'N/A'}</Text>
-                        <Text>Điểm tin cậy: {components?.confidence?.score || 'N/A'}</Text>
+                        <Text>Phiên bản Fingerprint: {components?.meta?.version || 'N/A'}</Text>
+                        <Text>Điểm tin cậy: {components?.confidence?.score ? formatConfidenceScore(components.confidence.score) : 'N/A'}</Text>
                         <Text>Phiên bản đánh giá: {components?.confidence?.revision || 'N/A'}</Text>
                     </Space>
                 </Descriptions.Item>
@@ -128,18 +132,6 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                         <Text>Request ID: {components?.requestId || 'N/A'}</Text>
                         <Text>Trạng thái: {components?.visitorFound ? 'Đã tìm thấy' : 'Chưa tìm thấy'}</Text>
                     </Space>
-                </Descriptions.Item>
-
-                <Descriptions.Item label={
-                    <Space>
-                        <InfoCircleOutlined />
-                        <span>Lưu ý</span>
-                    </Space>
-                }>
-                    <Text type="secondary">
-                        Để xem thêm thông tin chi tiết về thiết bị (IP, trình duyệt, hệ điều hành), 
-                        vui lòng nâng cấp lên FingerprintJS Pro.
-                    </Text>
                 </Descriptions.Item>
             </Descriptions>
         </StyledCard>

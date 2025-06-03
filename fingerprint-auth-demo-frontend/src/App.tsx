@@ -26,18 +26,8 @@ console.log('FingerprintJS Config:', {
 const fpPromise = FingerprintJS.load({
   apiKey: PUBLIC_KEY,
   endpoint: USE_PROXY ? `${FINGERPRINT_PROXY_BASE_URL}/api/fpjs` : FINGERPRINT_API_URL,
-  region: 'ap',  // Use 'ap' for Asia region
-  // Enable advanced device information
-  extendedResult: true,
-  // Enable additional signals
-  signals: [
-    'browserDetails',
-    'osDetails',
-    'deviceDetails',
-    'ipInfo',
-    'incognito'
-  ]
-} as any); // Type assertion to bypass TypeScript check
+  region: 'ap'  // Use 'ap' for Asia region
+});
 
 // Share the instance with ApiService using static method
 ApiServiceWithPublicMethods.setFingerprintPromise(fpPromise);
@@ -60,7 +50,7 @@ const App: React.FC = () => {
         setError(null);
 
         const fp = await fpPromise;
-        const result = await fp.get();
+        const result = await fp.get({ extendedResult: true });
         console.log('=== VISITOR DATA START ===');
         console.log(JSON.stringify(result, null, 2));
         console.log('=== VISITOR DATA END ===');
