@@ -37,10 +37,19 @@ app:
   token:
     expiration: 300
     timestamp:
-      tolerance: 30
+      tolerance: 120
   rate:
     limit:
       window: 3600
       max: 100
   security:
-    max-ips-per-fingerprint: 3 
+    max-ips-per-fingerprint: 3
+
+# Fingerprint configuration
+fingerprint:
+  api-url: ${FINGERPRINT_API_URL:https://ap.api.fpjs.io}  # Asia Pacific endpoint
+  public-key: ${FINGERPRINT_PUBLIC_KEY:}  # Browser API key for client-side
+  secret-key: ${FINGERPRINT_SECRET_KEY:}  # Server API key for server-side operations
+  webhook:
+    enabled: ${FINGERPRINT_WEBHOOK_ENABLED:false}
+    secret: ${FINGERPRINT_WEBHOOK_SECRET:} 
