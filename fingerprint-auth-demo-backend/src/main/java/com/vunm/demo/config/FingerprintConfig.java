@@ -3,38 +3,40 @@ package com.vunm.demo.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 @Configuration
 public class FingerprintConfig {
 
-    @Value("${app.fingerprint.api-key:}")
-    private String apiKey;
+    @Value("${fingerprint.secret-key:}")
+    private String secretKey;
 
-    @Value("${app.fingerprint.api-url:https://api.fpjs.io}")
+    @Value("${fingerprint.public-key:}")
+    private String publicKey;
+
+    @Value("${fingerprint.api-url:https://api.fpjs.io}")
     private String apiUrl;
 
-    @Value("${app.fingerprint.api-region:us}")
-    private String apiRegion;
-
     @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
+    public RestClient restClient() {
+        return RestClient.builder()
+                .build();
     }
 
-    public String getApiKey() {
-        return apiKey;
+    public String getSecretKey() {
+        return secretKey;
+    }
+
+    public String getPublicKey() {
+        return publicKey;
     }
 
     public String getApiUrl() {
         return apiUrl;
     }
 
-    public String getApiRegion() {
-        return apiRegion;
-    }
-
     public boolean isConfigured() {
-        return apiKey != null && !apiKey.isEmpty();
+        return secretKey != null && !secretKey.isEmpty() 
+            && publicKey != null && !publicKey.isEmpty();
     }
 }

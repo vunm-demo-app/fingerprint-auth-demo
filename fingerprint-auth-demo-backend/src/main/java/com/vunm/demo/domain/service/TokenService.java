@@ -58,6 +58,12 @@ public class TokenService {
     }
 
     private boolean isRateLimited(String fingerprint) {
+        // Check for null fingerprint
+        if (fingerprint == null) {
+            log.warn("Null fingerprint detected in isRateLimited");
+            return false; // Không áp dụng rate limit cho fingerprint null
+        }
+        
         long now = System.currentTimeMillis();
         long windowStart = now - (rateLimitWindowSeconds * 1000);
 
@@ -74,6 +80,12 @@ public class TokenService {
     }
 
     private boolean hasTooManyFailedAttempts(String fingerprint) {
+        // Check for null fingerprint
+        if (fingerprint == null) {
+            log.warn("Null fingerprint detected in hasTooManyFailedAttempts");
+            return false; // Không chặn request với fingerprint null
+        }
+        
         long now = System.currentTimeMillis();
         long windowStart = now - (failedAttemptWindowSeconds * 1000);
 
@@ -85,6 +97,12 @@ public class TokenService {
     }
 
     private void recordFailedAttempt(String fingerprint) {
+        // Check for null fingerprint
+        if (fingerprint == null) {
+            log.warn("Null fingerprint detected in recordFailedAttempt");
+            return;
+        }
+        
         long now = System.currentTimeMillis();
         int attempts = failedAttempts.getOrDefault(fingerprint, 0) + 1;
         failedAttempts.put(fingerprint, attempts);
@@ -99,6 +117,12 @@ public class TokenService {
                                                  String clientIp, 
                                                  String userAgent,
                                                  Map<String, Object> fingerprintComponents) {
+        // Handle localhost IPv6
+        if ("0:0:0:0:0:0:0:1".equals(clientIp)) {
+            clientIp = "127.0.0.1";
+            log.debug("Converting localhost IPv6 to IPv4: {}", clientIp);
+        }
+
         log.debug("Validating token request from IP: {}, User-Agent: {}", clientIp, userAgent);
 
         // 0. Check failed attempts
@@ -180,11 +204,17 @@ public class TokenService {
             .failureReason(reason)
             .timestamp(Instant.now())
             .isSuspectedBot(isSuspectedBot)
-            .build();
+                .build();
         requestLogService.logRequest(failedLog);
     }
 
     public boolean validateToken(String token, String fingerprint) {
+        // Check for null fingerprint
+        if (fingerprint == null) {
+            log.warn("Null fingerprint detected in validateToken");
+            return false;
+        }
+        
         try {
             log.debug("Validating token for fingerprint: {}", fingerprint);
             
@@ -224,4 +254,4 @@ public class TokenService {
             return false;
         }
     }
-}
+} 

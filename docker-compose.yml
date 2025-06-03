@@ -3,17 +3,16 @@ version: '3.8'
 services:
   backend:
     build:
-      context: ./fingerprint-auth-demo-backend-go
+      context: ./fingerprint-auth-demo-backend
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      - PORT=8080
-      - GIN_MODE=release
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,https://fingerprint-auth-demo.onrender.com
-      - FINGERPRINT_API_KEY=${FINGERPRINT_API_KEY}
-      - FINGERPRINT_API_URL=https://api.fpjs.io
-      - FINGERPRINT_API_REGION=us
+      - SPRING_PROFILES_ACTIVE=dev
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000
+      - FINGERPRINT_SECRET_KEY=${FINGERPRINT_SECRET_KEY}
+      - FINGERPRINT_PUBLIC_KEY=${FINGERPRINT_PUBLIC_KEY}
+      - FINGERPRINT_API_URL=${FINGERPRINT_API_URL:-https://ap.api.fpjs.io}
     volumes:
       - backend-data:/app/data
     restart: unless-stopped
@@ -23,10 +22,11 @@ services:
       context: ./fingerprint-auth-demo-frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "3000:3000"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8080/api
-      - VITE_FINGERPRINT_PUBLIC_API_KEY=${VITE_FINGERPRINT_PUBLIC_API_KEY}
+      - VITE_FINGERPRINT_PUBLIC_KEY=${FINGERPRINT_PUBLIC_KEY}
+      - VITE_FINGERPRINT_PROXY_BASE_URL=${FINGERPRINT_PROXY_BASE_URL:-http://localhost:8080}
+      - VITE_FINGERPRINT_USE_PROXY=${FINGERPRINT_USE_PROXY:-false}
     depends_on:
       - backend
     restart: unless-stopped

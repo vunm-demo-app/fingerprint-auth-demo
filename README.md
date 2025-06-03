@@ -1,100 +1,106 @@
 # Fingerprint Authentication Demo
 
-Dự án này minh họa cách sử dụng FingerprintJS Pro để phát hiện bot và xác thực người dùng thông qua browser fingerprinting.
-
-## Tổng quan
-
-Ứng dụng bao gồm:
-
-- **Backend**: Ứng dụng Spring Boot xác minh fingerprint và phát hiện bot
-- **Frontend**: Ứng dụng React sử dụng FingerprintJS Pro để tạo fingerprint
+Ứng dụng demo xác thực thiết bị sử dụng FingerprintJS Pro.
 
 ## Tính năng
 
-- Browser fingerprinting với FingerprintJS Pro
-- Phát hiện bot phía server
-- Giới hạn tốc độ truy cập dựa trên fingerprint
-- Kiểm tra tính nhất quán của fingerprint
-- Bảng điều khiển admin để giám sát hoạt động đáng ngờ
+- Xác thực thiết bị thông qua FingerprintJS Pro
+- Hiển thị thông tin chi tiết về thiết bị truy cập:
+  - Mã định danh thiết bị
+  - Thông tin cơ bản (IP, trình duyệt, hệ điều hành)
+  - Lịch sử truy cập
+  - Độ tin cậy của xác thực
+  - Thông tin yêu cầu
+- Giao diện người dùng thân thiện với Ant Design
+- Hỗ trợ đa ngôn ngữ (Tiếng Việt)
+- Responsive design
 
-## Cài đặt
-
-### Yêu cầu
-
-- Java 17+
-- Node.js 16+
-- Docker (tùy chọn)
-
-### Biến môi trường
-
-#### Backend (.env file trong thư mục fingerprint-auth-demo-backend)
+## Cấu trúc dự án
 
 ```
-FINGERPRINT_API_KEY=your_secret_api_key
-FINGERPRINT_API_URL=https://api.fpjs.io
-FINGERPRINT_API_REGION=us
+fingerprint-auth-demo/
+├── fingerprint-auth-demo-frontend/     # Frontend React + Vite
+│   ├── src/
+│   │   ├── components/                 # React components
+│   │   │   ├── VisitorInfo.tsx        # Component hiển thị thông tin thiết bị
+│   │   │   ├── ErrorPage.tsx          # Component xử lý lỗi
+│   │   │   └── StockTable.tsx         # Component hiển thị dữ liệu chứng khoán
+│   │   ├── services/                  # API services
+│   │   │   └── api.ts                 # Service xử lý API calls
+│   │   └── App.tsx                    # Component chính
+│   └── .env                           # Cấu hình môi trường
+└── fingerprint-auth-demo-backend/      # Backend Spring Boot
+    └── src/
+        └── main/
+            ├── java/                  # Java source code
+            └── resources/             # Cấu hình backend
 ```
 
-#### Frontend (.env file trong thư mục fingerprint-auth-demo-frontend)
+## Cài đặt và Chạy
 
-```
-VITE_API_BASE_URL=http://localhost:8080/api
-VITE_FINGERPRINT_PUBLIC_API_KEY=zThPOeeB10e17zhjQbbh
-```
+### Frontend
 
-### Chạy trên môi trường local
-
-1. Khởi động backend:
-
-```bash
-cd fingerprint-auth-demo-backend
-./mvnw spring-boot:run
-```
-
-2. Khởi động frontend:
-
+1. Cài đặt dependencies:
 ```bash
 cd fingerprint-auth-demo-frontend
 npm install
+```
+
+2. Cấu hình môi trường:
+- Tạo file `.env` từ `.env.example`
+- Cập nhật các biến môi trường:
+  - `VITE_FINGERPRINT_API_KEY`: API key của FingerprintJS Pro
+  - `VITE_FINGERPRINT_API_URL`: URL API của FingerprintJS Pro
+  - `VITE_USE_PROXY`: Sử dụng proxy hay không (true/false)
+  - `VITE_API_BASE_URL`: URL của backend API
+
+3. Chạy development server:
+```bash
 npm run dev
 ```
 
-### Chạy với Docker
+### Backend
 
+1. Cài đặt Java 17 hoặc cao hơn
+2. Cấu hình trong `application.properties`
+3. Chạy ứng dụng:
 ```bash
-docker-compose up
+./mvnw spring-boot:run
 ```
 
 ## API Endpoints
 
-- `POST /api/app-token`: Tạo token ứng dụng với xác minh fingerprint
-- `GET /api/stock-prices`: Lấy giá cổ phiếu (endpoint được bảo vệ)
-- `GET /api/admin/logs`: Lấy nhật ký yêu cầu (endpoint admin)
-- `GET /api/admin/statistics`: Lấy thống kê (endpoint admin)
+### Frontend
+- `/`: Trang chủ hiển thị thông tin thiết bị
+- `/admin`: Trang quản trị (yêu cầu xác thực)
 
-## Phát hiện Bot
+### Backend
+- `/api/fpjs`: Proxy endpoint cho FingerprintJS Pro
+- `/api/stocks`: API lấy dữ liệu chứng khoán
+- `/api/tokens`: API quản lý token
 
-Ứng dụng sử dụng nhiều lớp phát hiện bot:
+## Công nghệ sử dụng
 
-1. **Phía client**: Phát hiện bot của FingerprintJS Pro
-2. **Phía server**: Xác minh sử dụng FingerprintJS Pro API
-3. **Logic tùy chỉnh**: Kiểm tra bổ sung cho các mẫu đáng ngờ
+- Frontend:
+  - React 18
+  - Vite
+  - Ant Design
+  - FingerprintJS Pro
+  - TypeScript
+  - Styled Components
 
-## Cân nhắc bảo mật
+- Backend:
+  - Spring Boot
+  - Java 17
+  - Maven
 
-- API key nên được giữ an toàn và không commit vào version control
-- Giới hạn tốc độ được triển khai để ngăn chặn lạm dụng
-- Tính nhất quán của fingerprint được kiểm tra để phát hiện giả mạo
+## Bảo mật
 
-## Cách FingerprintJS Pro hoạt động
-
-FingerprintJS Pro cung cấp khả năng phát hiện bot mạnh mẽ hơn so với phiên bản miễn phí:
-
-1. **Phát hiện bot nâng cao**: Sử dụng machine learning để phát hiện bot với độ chính xác cao
-2. **Xác minh phía server**: API cho phép xác minh fingerprint ở phía server
-3. **Phân tích hành vi**: Phát hiện các mẫu hành vi bất thường
-4. **Báo cáo chi tiết**: Cung cấp thông tin về loại bot và xác suất
+- Sử dụng FingerprintJS Pro để xác thực thiết bị
+- API key được lưu trong biến môi trường
+- Hỗ trợ proxy để bảo vệ API key
+- Rate limiting để tránh quá tải
 
 ## Giấy phép
 
-Dự án này chỉ dành cho mục đích demo.
+MIT License

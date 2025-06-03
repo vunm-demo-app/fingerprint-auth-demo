@@ -1,6 +1,54 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+Tất cả các thay đổi đáng chú ý trong dự án này sẽ được ghi lại trong file này.
+
+## [1.1.0] - 2024-03-06
+
+### Thay đổi
+- Cập nhật giao diện VisitorInfo component
+  - Thêm styled components cho giao diện đẹp hơn
+  - Hiển thị đầy đủ thông tin từ FingerprintJS Pro API
+  - Thêm các icon trực quan cho từng mục thông tin
+  - Dịch các label sang tiếng Việt
+- Cải thiện cấu trúc dữ liệu
+  - Định nghĩa rõ ràng interface cho visitor info
+  - Loại bỏ các trường không sử dụng
+  - Tối ưu hóa hiển thị thông tin
+
+### Sửa lỗi
+- Sửa lỗi icon BrowserOutlined không tồn tại
+- Sửa lỗi hiển thị thông tin trống
+- Sửa lỗi định dạng ngày tháng
+
+## [1.0.0] - 2024-03-05
+
+### Thêm mới
+- Khởi tạo dự án với React + Vite
+- Tích hợp FingerprintJS Pro
+- Tạo các component cơ bản:
+  - VisitorInfo: Hiển thị thông tin thiết bị
+  - ErrorPage: Xử lý lỗi
+  - StockTable: Hiển thị dữ liệu chứng khoán
+- Cấu hình proxy cho FingerprintJS Pro
+- Thêm biến môi trường cho cấu hình
+- Tích hợp Ant Design cho UI
+- Hỗ trợ đa ngôn ngữ (Tiếng Việt)
+
+### Cấu hình
+- Thêm các biến môi trường:
+  - VITE_FINGERPRINT_API_KEY
+  - VITE_FINGERPRINT_API_URL
+  - VITE_USE_PROXY
+  - VITE_API_BASE_URL
+- Cấu hình TypeScript
+- Cấu hình ESLint và Prettier
+- Thêm các script npm
+
+### Tài liệu
+- Tạo README.md với hướng dẫn cài đặt và sử dụng
+- Tạo CHANGELOG.md để theo dõi thay đổi
+- Thêm comments cho code
+- Cập nhật cấu trúc thư mục
 
 ## [0.2.0] - 2025-05-30
 

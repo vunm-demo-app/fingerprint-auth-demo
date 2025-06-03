@@ -2,8 +2,8 @@ import axios from 'axios';
 import FingerprintJS from '@fingerprintjs/fingerprintjs-pro';
 import SHA256 from 'crypto-js/sha256';
 
-// Use the Pro version with the public API key
-const fpPromise = FingerprintJS.load({ 
+// Use a mutable reference for the FingerprintJS promise
+let fpPromiseRef = FingerprintJS.load({ 
   apiKey: import.meta.env.VITE_FINGERPRINT_PUBLIC_API_KEY || 'zThPOeeB10e17zhjQbbh'
 });
 
@@ -72,7 +72,7 @@ const api = axios.create({
     },
 });
 
-class ApiService {
+export class ApiService {
     private token: AppToken | null = null;
     private fingerprint: string | null = null;
     private deviceId: string | null = null;
@@ -172,7 +172,7 @@ class ApiService {
         return SHA256(str).toString();
     }
 
-    private async getFingerprint(): Promise<{ visitorId: string, components: Record<string, any> }> {
+    protected async getFingerprint(): Promise<{ visitorId: string, components: Record<string, any> }> {
         // If we have cached values and they're valid, use them
         if (this.fingerprint && this.fingerprintComponents) {
             console.log('Using cached fingerprint:', this.fingerprint);
@@ -182,7 +182,7 @@ class ApiService {
             };
         }
         
-        const fp = await fpPromise;
+        const fp = await fpPromiseRef;
         this.fpResult = await fp.get() as ExtendedGetResult;
         
         // Ensure fingerprint is always a string
@@ -341,5 +341,11 @@ class ApiService {
     }
 }
 
-export const apiService = new ApiService();
+export class ApiServiceWithPublicMethods extends ApiService {
+    public static setFingerprintPromise(promise: Promise<any>) {
+        fpPromiseRef = promise;
+    }
+}
+
+export const apiService = new ApiServiceWithPublicMethods();
 export type { StockPrice, AppToken, AppTokenRequest };
