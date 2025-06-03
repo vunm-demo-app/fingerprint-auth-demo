@@ -1,11 +1,8 @@
 import React from 'react';
-import { Card, Typography, Descriptions, Tag, Space } from 'antd';
+import { Card, Typography, Descriptions, Space } from 'antd';
 import { 
     SafetyOutlined, 
-    GlobalOutlined, 
-    ClockCircleOutlined, 
     IdcardOutlined,
-    DesktopOutlined,
     ChromeOutlined,
     EyeOutlined,
     HistoryOutlined,
@@ -13,7 +10,7 @@ import {
 } from '@ant-design/icons';
 import styled from 'styled-components';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const StyledCard = styled(Card)`
     .ant-card-head {
@@ -38,33 +35,7 @@ const ValueText = styled(Text)`
 
 interface VisitorInfoProps {
     fingerprint: string | null;
-    components: {
-        visitorId: string;
-        requestId: string;
-        browserName: string;
-        browserVersion: string;
-        confidence: {
-            revision: string;
-            score: number;
-        };
-        device: string;
-        firstSeenAt: {
-            global: string;
-            subscription: string;
-        };
-        incognito: boolean;
-        ip: string;
-        lastSeenAt: {
-            global: string;
-            subscription: string;
-        };
-        meta: {
-            version: string;
-        };
-        os: string;
-        osVersion: string;
-        visitorFound: boolean;
-    } | null;
+    components: any;
 }
 
 const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) => {
@@ -84,6 +55,9 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
         });
     };
 
+    // Log để debug
+    console.log('VisitorInfo components:', components);
+
     return (
         <StyledCard 
             title={
@@ -101,7 +75,7 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                         <span>Mã định danh</span>
                     </Space>
                 }>
-                    <ValueText copyable>{components.visitorId}</ValueText>
+                    <ValueText copyable>{components?.visitorId || 'N/A'}</ValueText>
                 </Descriptions.Item>
 
                 <Descriptions.Item label={
@@ -111,11 +85,11 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                     </Space>
                 }>
                     <Space direction="vertical" size="small">
-                        <Text>IP: {components.ip}</Text>
-                        <Text>Trình duyệt: {components.browserName} {components.browserVersion}</Text>
-                        <Text>Hệ điều hành: {components.os} {components.osVersion}</Text>
-                        <Text>Thiết bị: {components.device}</Text>
-                        <Text>Chế độ ẩn danh: {components.incognito ? 'Có' : 'Không'}</Text>
+                        <Text>IP: {components?.ipInfo?.ip || 'N/A'}</Text>
+                        <Text>Trình duyệt: {components?.browserDetails?.name || 'N/A'} {components?.browserDetails?.version || ''}</Text>
+                        <Text>Hệ điều hành: {components?.osDetails?.name || 'N/A'} {components?.osDetails?.version || ''}</Text>
+                        <Text>Thiết bị: {components?.deviceDetails?.type || 'N/A'}</Text>
+                        <Text>Chế độ ẩn danh: {components?.incognito ? 'Có' : 'Không'}</Text>
                     </Space>
                 </Descriptions.Item>
 
@@ -126,8 +100,8 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                     </Space>
                 }>
                     <Space direction="vertical" size="small">
-                        <Text>Lần đầu truy cập: {formatDate(components.firstSeenAt.global)}</Text>
-                        <Text>Lần cuối truy cập: {formatDate(components.lastSeenAt.global)}</Text>
+                        <Text>Lần đầu truy cập: {components?.firstSeenAt?.global ? formatDate(components.firstSeenAt.global) : 'Không có dữ liệu'}</Text>
+                        <Text>Lần cuối truy cập: {components?.lastSeenAt?.global ? formatDate(components.lastSeenAt.global) : 'Không có dữ liệu'}</Text>
                     </Space>
                 </Descriptions.Item>
 
@@ -138,9 +112,9 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                     </Space>
                 }>
                     <Space direction="vertical" size="small">
-                        <Text>Phiên bản: {components.meta.version}</Text>
-                        <Text>Điểm tin cậy: {components.confidence.score}</Text>
-                        <Text>Phiên bản đánh giá: {components.confidence.revision}</Text>
+                        <Text>Phiên bản: {components?.meta?.version || 'N/A'}</Text>
+                        <Text>Điểm tin cậy: {components?.confidence?.score || 'N/A'}</Text>
+                        <Text>Phiên bản đánh giá: {components?.confidence?.revision || 'N/A'}</Text>
                     </Space>
                 </Descriptions.Item>
 
@@ -151,9 +125,21 @@ const VisitorInfo: React.FC<VisitorInfoProps> = ({ fingerprint, components }) =>
                     </Space>
                 }>
                     <Space direction="vertical" size="small">
-                        <Text>Request ID: {components.requestId}</Text>
-                        <Text>Trạng thái: {components.visitorFound ? 'Đã tìm thấy' : 'Chưa tìm thấy'}</Text>
+                        <Text>Request ID: {components?.requestId || 'N/A'}</Text>
+                        <Text>Trạng thái: {components?.visitorFound ? 'Đã tìm thấy' : 'Chưa tìm thấy'}</Text>
                     </Space>
+                </Descriptions.Item>
+
+                <Descriptions.Item label={
+                    <Space>
+                        <InfoCircleOutlined />
+                        <span>Lưu ý</span>
+                    </Space>
+                }>
+                    <Text type="secondary">
+                        Để xem thêm thông tin chi tiết về thiết bị (IP, trình duyệt, hệ điều hành), 
+                        vui lòng nâng cấp lên FingerprintJS Pro.
+                    </Text>
                 </Descriptions.Item>
             </Descriptions>
         </StyledCard>

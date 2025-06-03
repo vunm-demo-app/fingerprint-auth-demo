@@ -50,7 +50,7 @@ const ErrorDetails = styled(Paragraph)`
   overflow-wrap: break-word;
 `;
 
-export interface ErrorPageProps {
+interface ErrorPageProps {
   error: string;
   suggestion?: string;
   onRetry?: () => void;
@@ -64,13 +64,6 @@ const ErrorPage: React.FC<ErrorPageProps> = ({ error, suggestion, onRetry }) => 
       return 'Không thể khởi tạo ứng dụng';
     }
     return 'Đã xảy ra lỗi';
-  };
-
-  const getErrorSubtitle = () => {
-    if (isInitializationError) {
-      return 'Hệ thống không thể xác thực thiết bị của bạn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ nếu vấn đề vẫn tiếp tục.';
-    }
-    return 'Đã có lỗi xảy ra trong quá trình xử lý yêu cầu của bạn. Vui lòng thử lại.';
   };
 
   return (
