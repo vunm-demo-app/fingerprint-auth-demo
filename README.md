@@ -165,11 +165,11 @@ sequenceDiagram
 
 ### Frontend (SDK)
 ```typescript
-// Khởi tạo SDK
+// Khởi tạo SDK với cấu hình tối thiểu
 const fpPromise = FingerprintJS.load({
   apiKey: 'your-api-key',
-  endpoint: 'https://api.fpjs.io', // hoặc proxy endpoint
-  region: 'ap'
+  // FINGERPRINT_ENDPOINT là optional, nếu không set sẽ dùng endpoint mặc định
+  ...(process.env.FINGERPRINT_ENDPOINT && { endpoint: process.env.FINGERPRINT_ENDPOINT })
 });
 
 // Sử dụng SDK

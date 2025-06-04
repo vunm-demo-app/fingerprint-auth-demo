@@ -15,18 +15,21 @@ const FINGERPRINT_PROXY_BASE_URL = import.meta.env.VITE_FINGERPRINT_PROXY_BASE_U
 const USE_PROXY = (import.meta.env.VITE_FINGERPRINT_USE_PROXY || 'false').toLowerCase() === 'true';
 const PUBLIC_KEY = import.meta.env.VITE_FINGERPRINT_PUBLIC_KEY || '';
 const FINGERPRINT_API_URL = import.meta.env.VITE_FINGERPRINT_API_URL || 'https://api.fpjs.io';
+const FINGERPRINT_ENDPOINT = USE_PROXY ? `${FINGERPRINT_PROXY_BASE_URL}/api/fpjs` : FINGERPRINT_API_URL
+const FINGERPRINT_LOADER_URL = `3.11.10`
 
 // Initialize FingerprintJS Pro with your API key and proxy endpoints
 console.log('FingerprintJS Config:', {
   apiKey: PUBLIC_KEY ? 'API Key is set' : 'API Key is missing',
-  endpoint: USE_PROXY ? `${FINGERPRINT_PROXY_BASE_URL}/api/fpjs` : FINGERPRINT_API_URL,
+  endpoint: FINGERPRINT_ENDPOINT,
   region: 'ap'
 });
 
 const fpPromise = FingerprintJS.load({
   apiKey: PUBLIC_KEY,
-  endpoint: USE_PROXY ? `${FINGERPRINT_PROXY_BASE_URL}/api/fpjs` : FINGERPRINT_API_URL,
-  region: 'ap'  // Use 'ap' for Asia region
+  endpoint: FINGERPRINT_ENDPOINT,
+  region: 'ap',  // Use 'ap' for Asia region
+  scriptUrlPattern: `${FINGERPRINT_API_URL}/web/v3/${PUBLIC_KEY}/loader_v${FINGERPRINT_LOADER_URL}.js`
 });
 
 // Share the instance with ApiService using static method
