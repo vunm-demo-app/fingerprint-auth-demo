@@ -7,8 +7,11 @@ import lombok.Value;
 @Builder
 public class VisitorInfo {
     String visitorId;
+    String requestId;
     boolean isIncognito;
     String ipAddress;
+    double botProbability;
+    String botType;
     Location location;
     BrowserDetails browserDetails;
 

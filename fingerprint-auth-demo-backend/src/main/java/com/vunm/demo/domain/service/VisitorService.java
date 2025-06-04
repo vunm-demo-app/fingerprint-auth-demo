@@ -1,7 +1,7 @@
 package com.vunm.demo.domain.service;
 
 import com.fingerprint.api.FingerprintApi;
-import com.fingerprint.model.VisitorsGetResponse;
+import com.fingerprint.model.EventsGetResponse;
 import com.fingerprint.sdk.ApiClient;
 import com.fingerprint.sdk.ApiException;
 import com.fingerprint.sdk.Configuration;
@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+
 
 @Slf4j
 @Service
@@ -48,53 +49,99 @@ public class VisitorService implements GetVisitorInfoUseCase {
     }
 
     @Override
-    public VisitorInfo getVisitorInfo(String visitorId, String ipAddress) {
+    public VisitorInfo getVisitorInfo(String visitorId, String ipAddress, String requestId) {
         try {
-            log.debug("Getting visitor info for ID: {} and IP: {}", visitorId, ipAddress);
-            // Get visits using the SDK with required parameters
-            VisitorsGetResponse response = fingerprintApi.getVisits(
-                visitorId,      // visitorId
-                null,          // requestId
-                null,          // linkedId
-                1,            // limit to 1 result
-                null,         // paginationKey
-                null          // before
-            );
+            log.debug("Getting visitor info for requestId: {}", requestId);
             
-            if (response.getVisits() == null || response.getVisits().isEmpty()) {
-                log.warn("No visits found for visitor ID: {}", visitorId);
-                return createEmptyVisitorInfo(visitorId, ipAddress);
+            // Get event using EventsGetResponse
+            EventsGetResponse eventResponse = fingerprintApi.getEvent(requestId);
+            log.debug("Event response for requestId {}: {}", requestId, eventResponse);
+
+
+            if (eventResponse == null || eventResponse.getProducts().getBotd() == null) {
+                log.warn("No event found for requestId: {}", requestId);
+                throw new RuntimeException("RequestId not found, potential spoofing detected.");
             }
 
-            var visit = response.getVisits().get(0);
-            log.info("Found visit data for visitor ID: {}", visitorId);
+            // check null eventResponse.getProducts().getBotd().getData();
+            if (eventResponse.getProducts().getBotd() == null ||
+                eventResponse.getProducts().getBotd().getData() == null) {
+                log.warn("No BotD data found for requestId: {}", requestId);
+                return createEmptyVisitorInfo(visitorId, ipAddress, requestId);
+            }
+            var botDetection = eventResponse.getProducts().getBotd().getData();
+            double botResultValue = 0.0;
+            String botType = "unknown";
+            String botResult = "notDetected";
+
+            if (botDetection != null) {
+                var bot = botDetection .getBot();
+                botResult = bot.getResult().getValue() ;
+                botType = bot.getType() != null ? bot.getType() : "unknown";
+            }
+
+            log.info("Bot detection results - requestId: {}, probability: {}, type: {}, result: {}", 
+                requestId, botResultValue, botType, botResult);
+
+            if ("bad".equals(botResult)) {
+                log.warn("Bot detected with high probability ({}) and type {} for requestId: {}", 
+                    botResultValue, botType, requestId);
+                throw new RuntimeException("Malicious bot detected, scraping is not allowed.");
+            }
+
+            // Get location and browser details from event if available
+            String country = "Unknown";
+            String city = "Unknown";
+            String browser = "Unknown";
+            String os = "Unknown";
+            String device = "Unknown";
+
+            try {
+                var identification = eventResponse.getProducts().getIdentification();
+                log.info("Identification data for visitorId:{} requestId {}: {}", visitorId, requestId, identification);
+                if (identification != null && identification.getData() != null) {
+                    var data = identification.getData();
+                    var browserDetails = data.getBrowserDetails();
+                    browser = browserDetails.getBrowserName();
+                    os = browserDetails.getOs();
+                    device = browserDetails.getDevice();
+                }
+            } catch (Exception e) {
+                log.warn("Could not extract location or browser details from event: {}", e.getMessage());
+            }
 
             return VisitorInfo.builder()
                     .visitorId(visitorId)
-                    .isIncognito(false)
+                    .requestId(requestId)
+                    .isIncognito(eventResponse.getProducts().getIdentification() != null && eventResponse.getProducts().getIdentification().getData() != null && eventResponse.getProducts().getIdentification().getData().getIncognito())
                     .ipAddress(ipAddress)
+                    .botProbability(botResultValue)
+                    .botType(botType)
                     .location(VisitorInfo.Location.builder()
-                            .country("Unknown")
-                            .city("Unknown")
+                            .country(country)
+                            .city(city)
                             .build())
                     .browserDetails(VisitorInfo.BrowserDetails.builder()
-                            .browser("Unknown")
-                            .os("Unknown")
-                            .device("Unknown")
+                            .browser(browser)
+                            .os(os)
+                            .device(device)
                             .build())
                     .build();
 
         } catch (ApiException e) {
-            log.warn("Failed to get visitor information for visitorId: {}. Error: {}", visitorId, e.getMessage());
-            return createEmptyVisitorInfo(visitorId, ipAddress);
+            log.warn("Failed to get event for requestId: {}. Error: {}", requestId, e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 
-    private VisitorInfo createEmptyVisitorInfo(String visitorId, String ipAddress) {
+    private VisitorInfo createEmptyVisitorInfo(String visitorId, String ipAddress, String requestId) {
         return VisitorInfo.builder()
                 .visitorId(visitorId)
+                .requestId(requestId)
                 .isIncognito(false)
                 .ipAddress(ipAddress)
+                .botProbability(1.0)  // Assume bot if no data
+                .botType("unknown")
                 .location(VisitorInfo.Location.builder()
                         .country("Unknown")
                         .city("Unknown")

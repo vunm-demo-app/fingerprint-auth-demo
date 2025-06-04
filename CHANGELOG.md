@@ -155,4 +155,26 @@ Tất cả các thay đổi đáng chú ý trong dự án này sẽ được ghi
 - Basic fingerprint authentication
 - Token generation and validation
 - Rate limiting implementation
-- Basic security measures 
+- Basic security measures
+
+## [1.2.0] - 2024-03-07
+
+### Thay đổi
+- Cải thiện xử lý JWT token
+  - Chuyển từ HS512 sang HS256 để tối ưu hiệu suất
+  - Sử dụng `Jwts.SIG.HS256.key()` để tạo key an toàn
+  - Cập nhật API của jjwt lên phiên bản 0.12.5
+  - Thống nhất secret key giữa các service
+- Cải thiện bảo mật
+  - Thêm kiểm tra fingerprint trong token validation
+  - Ghi log chi tiết cho các lỗi xác thực
+  - Tăng cường xử lý lỗi và logging
+- Cải thiện frontend
+  - Thêm xử lý 401 error trong StockTable
+  - Dừng auto-refresh sau 5 lần lỗi 401 liên tiếp
+  - Hiển thị thông báo lỗi rõ ràng hơn
+
+### Sửa lỗi
+- Sửa lỗi token validation không khớp do secret key khác nhau
+- Sửa lỗi key size không đủ cho HS512
+- Sửa lỗi frontend bị loop refresh khi token hết hạn 

@@ -14,7 +14,8 @@ interface AppToken {
 }
 
 interface AppTokenRequest {
-    deviceId: string;
+    visitorId: string;
+    requestId: string;
     fingerprint: string;
     timestamp: number;
     components: Record<string, any>;
@@ -75,7 +76,7 @@ const api = axios.create({
 export class ApiService {
     private token: AppToken | null = null;
     private fingerprint: string | null = null;
-    private deviceId: string | null = null;
+    private visitorId: string | null = null;
     private fingerprintComponents: Record<string, any> | null = null;
     private initPromise: Promise<void> | null = null;
     private fpResult: ExtendedGetResult | null = null;
@@ -122,18 +123,19 @@ export class ApiService {
             // Get server time first
             await this.getServerTime();
 
-            const { visitorId, components } = await this.getFingerprint();
-            const deviceId = this.generateDeviceId();
+            const { visitorId, requestId, components } = await this.getFingerprint();
             
             const request: AppTokenRequest = {
-                deviceId,
+                visitorId,
+                requestId,
                 fingerprint: visitorId,
                 timestamp: this.getCurrentTimestamp(),
                 components
             };
 
             console.log('Sending token request:', {
-                deviceId: request.deviceId,
+                visitorId: request.visitorId,
+                requestId: request.requestId,
                 fingerprint: request.fingerprint,
                 timestamp: request.timestamp,
                 components: {
@@ -146,6 +148,7 @@ export class ApiService {
 
             const response = await api.post<AppToken>('/app-token', request);
             this.token = response.data;
+            this.visitorId = visitorId;
             console.log('Token response:', this.token);
         } catch (error) {
             console.error('Failed to initialize ApiService:', error);
@@ -154,16 +157,16 @@ export class ApiService {
     }
 
     private generateDeviceId(): string {
-        if (!this.deviceId) {
+        if (!this.visitorId) {
             const storedDeviceId = localStorage.getItem('deviceId');
             if (storedDeviceId) {
-                this.deviceId = storedDeviceId;
+                this.visitorId = storedDeviceId;
             } else {
-                this.deviceId = 'web-' + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem('deviceId', this.deviceId);
+                this.visitorId = 'web-' + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem('deviceId', this.visitorId);
             }
         }
-        return this.deviceId;
+        return this.visitorId;
     }
 
     private hashComponent(component: any): string {
@@ -172,18 +175,24 @@ export class ApiService {
         return SHA256(str).toString();
     }
 
-    protected async getFingerprint(): Promise<{ visitorId: string, components: Record<string, any> }> {
-        // If we have cached values and they're valid, use them
+    protected async getFingerprint(): Promise<{ visitorId: string, requestId: string, components: Record<string, any> }> {
+        // Always get fresh requestId from Fingerprint
+        const fp = await fpPromiseRef;
+        this.fpResult = await fp.get() as ExtendedGetResult;
+        
+        // Get fresh requestId
+        const requestId = this.fpResult?.requestId || '';
+        console.log('Fresh requestId from Fingerprint:', requestId);
+        
+        // If we have cached values for other fields and they're valid, use them
         if (this.fingerprint && this.fingerprintComponents) {
             console.log('Using cached fingerprint:', this.fingerprint);
             return {
                 visitorId: this.fingerprint,
+                requestId, // Use fresh requestId
                 components: this.fingerprintComponents
             };
         }
-        
-        const fp = await fpPromiseRef;
-        this.fpResult = await fp.get() as ExtendedGetResult;
         
         // Ensure fingerprint is always a string
         this.fingerprint = this.fpResult.visitorId || '';
@@ -249,6 +258,7 @@ export class ApiService {
 
         return {
             visitorId: this.fingerprint,
+            requestId, // Use fresh requestId
             components: this.fingerprintComponents
         };
     }
@@ -263,18 +273,19 @@ export class ApiService {
         // Check if token needs refresh
         if (!this.token || Date.now() >= this.token.expiresAt * 1000) {
             console.log('Token needs refresh. Current token:', this.token);
-            const { visitorId, components } = await this.getFingerprint();
-            const deviceId = this.generateDeviceId();
+            const { visitorId, requestId, components } = await this.getFingerprint();
             
             const request: AppTokenRequest = {
-                deviceId,
+                visitorId,
+                requestId,
                 fingerprint: visitorId,
                 timestamp: this.getCurrentTimestamp(),
                 components
             };
 
             console.log('Sending token refresh request:', {
-                deviceId: request.deviceId,
+                visitorId: request.visitorId,
+                requestId: request.requestId,
                 fingerprint: request.fingerprint,
                 timestamp: request.timestamp,
                 components: {
@@ -287,6 +298,7 @@ export class ApiService {
 
             const response = await api.post<AppToken>('/app-token', request);
             this.token = response.data;
+            this.visitorId = visitorId;
             console.log('Token refresh response:', this.token);
         }
     }

@@ -52,4 +52,9 @@ fingerprint:
   secret-key: ${FINGERPRINT_SECRET_KEY:}  # Server API key for server-side operations
   webhook:
     enabled: ${FINGERPRINT_WEBHOOK_ENABLED:false}
-    secret: ${FINGERPRINT_WEBHOOK_SECRET:} 
+    secret: ${FINGERPRINT_WEBHOOK_SECRET:}
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-here}
+  expiration: ${JWT_EXPIRATION:300000} # 5 minutes in milliseconds 

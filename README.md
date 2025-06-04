@@ -62,7 +62,25 @@ npm run dev
 ### Backend
 
 1. Cài đặt Java 17 hoặc cao hơn
-2. Cấu hình trong `application.properties`
+2. Cấu hình trong `application.properties`:
+```properties
+# JWT Configuration
+jwt.secret=your-secret-key-here
+jwt.expiration=300
+
+# Security Configuration
+app.security.max-failed-attempts=5
+app.security.failed-attempt-window=3600
+
+# Rate Limiting
+app.rate.limit.window=3600
+app.rate.limit.max=100
+
+# Token Configuration
+app.token.expiration=300
+app.token.timestamp.tolerance=120
+```
+
 3. Chạy ứng dụng:
 ```bash
 ./mvnw spring-boot:run
@@ -93,13 +111,24 @@ npm run dev
   - Spring Boot
   - Java 17
   - Maven
+  - jjwt 0.12.5
 
 ## Bảo mật
 
-- Sử dụng FingerprintJS Pro để xác thực thiết bị
-- API key được lưu trong biến môi trường
-- Hỗ trợ proxy để bảo vệ API key
-- Rate limiting để tránh quá tải
+- Xác thực và bảo mật:
+  - Sử dụng FingerprintJS Pro để xác thực thiết bị
+  - JWT token với HS256 và key size 256-bit
+  - Kiểm tra fingerprint trong token validation
+  - Rate limiting để tránh quá tải
+  - Theo dõi và chặn các nỗ lực xác thực thất bại
+  - Ghi log chi tiết cho các sự kiện bảo mật
+
+- Cấu hình bảo mật:
+  - API key được lưu trong biến môi trường
+  - Hỗ trợ proxy để bảo vệ API key
+  - Token expiration và timestamp validation
+  - CORS được cấu hình chặt chẽ
+  - Xử lý lỗi 401 và auto-refresh thông minh
 
 ## Giấy phép
 

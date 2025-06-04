@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AppTokenRequest {
-    private String deviceId;
+    private String visitorId;
+    private String requestId;
     private String fingerprint;
     private long timestamp;
 } 

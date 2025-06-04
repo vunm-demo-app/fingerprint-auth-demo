@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Table, Typography, Spin } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { apiService, type StockPrice } from '../services/api';
@@ -7,6 +7,8 @@ const StockTable: React.FC = () => {
     const [data, setData] = useState<StockPrice[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [consecutive401Count, setConsecutive401Count] = useState(0);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     const getPriceColor = (price: number, refPrice: number) => {
         if (price > refPrice) return '#00B14F';
@@ -108,23 +110,44 @@ const StockTable: React.FC = () => {
     ];
 
     useEffect(() => {
+        let isUnmounted = false;
         const fetchData = async () => {
             try {
                 setLoading(true);
                 setError(null);
                 const stocks = await apiService.getAllStocks();
-                setData(stocks);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to fetch data');
+                if (!isUnmounted) {
+                    setData(stocks);
+                    setConsecutive401Count(0); // Reset on success
+                }
+            } catch (err: any) {
+                if (err?.response?.status === 401) {
+                    setConsecutive401Count(prev => {
+                        const next = prev + 1;
+                        if (next >= 5 && intervalRef.current) {
+                            clearInterval(intervalRef.current);
+                            intervalRef.current = null;
+                        }
+                        return next;
+                    });
+                    setError('Unauthorized (401): Đã dừng tự động làm mới sau 5 lần lỗi.');
+                } else {
+                    setError(err instanceof Error ? err.message : 'Failed to fetch data');
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-        const interval = setInterval(fetchData, 5000); // Refresh every 5 seconds
+        intervalRef.current = setInterval(fetchData, 5000); // Refresh every 5 seconds
 
-        return () => clearInterval(interval);
+        return () => {
+            isUnmounted = true;
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
+        };
     }, []);
 
     if (error) {

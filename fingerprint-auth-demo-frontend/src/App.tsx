@@ -110,7 +110,7 @@ const App: React.FC = () => {
             }
           >
             <div style={{ marginTop: 24, padding: '0 16px' }}>
-              <p>Initializing security features...</p>
+              {/*<p>Initializing security features...</p>*/}
             </div>
           </Spin>
         </div>

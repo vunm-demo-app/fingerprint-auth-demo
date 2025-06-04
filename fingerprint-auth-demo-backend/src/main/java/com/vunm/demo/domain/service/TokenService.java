@@ -1,28 +1,26 @@
 package com.vunm.demo.domain.service;
 
+import com.vunm.demo.api.dto.AppTokenRequest;
+import com.vunm.demo.api.dto.AppTokenResponse;
+import com.vunm.demo.domain.exception.BotDetectedException;
 import com.vunm.demo.domain.model.AppToken;
-import com.vunm.demo.api.dto.AppTokenRequestWithComponents;
 import com.vunm.demo.domain.model.RequestLog;
+import com.vunm.demo.domain.service.jwt.JwtService;
 import com.vunm.demo.util.IpAddressUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.vunm.demo.domain.service.FingerprintVerificationService;
-
 @Slf4j
 @Service
 public class TokenService {
-    private final SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    private final JwtService jwtService;
     private final RequestLogService requestLogService;
     private final FingerprintVerificationService fingerprintVerificationService;
     private final IpAddressUtil ipAddressUtil;
@@ -49,21 +47,24 @@ public class TokenService {
     @Value("${app.security.failed-attempt-window:3600}") // 1 hour window
     private long failedAttemptWindowSeconds;
 
-    public TokenService(RequestLogService requestLogService, 
-                       FingerprintVerificationService fingerprintVerificationService,
-                       IpAddressUtil ipAddressUtil) {
+    public TokenService(RequestLogService requestLogService,
+                        FingerprintVerificationService fingerprintVerificationService,
+                        IpAddressUtil ipAddressUtil,
+                        JwtService jwtService) {
         this.requestLogService = requestLogService;
         this.fingerprintVerificationService = fingerprintVerificationService;
         this.ipAddressUtil = ipAddressUtil;
+        this.jwtService = jwtService;
     }
 
-    private boolean isRateLimited(String fingerprint) {
-        // Check for null fingerprint
-        if (fingerprint == null) {
-            log.warn("Null fingerprint detected in isRateLimited");
-            return false; // Không áp dụng rate limit cho fingerprint null
+    private boolean isRateLimited(String fingerprint, String clientIp) {
+        if (fingerprint == null || clientIp == null) {
+            log.warn("Null fingerprint or IP detected in isRateLimited");
+            return false;
         }
-        
+
+        // Create a composite key combining fingerprint and IP
+        String key = fingerprint + ":" + clientIp;
         long now = System.currentTimeMillis();
         long windowStart = now - (rateLimitWindowSeconds * 1000);
 
@@ -71,29 +72,34 @@ public class TokenService {
         lastRequestTimes.entrySet().removeIf(entry -> entry.getValue() < windowStart);
         requestCounts.entrySet().removeIf(entry -> !lastRequestTimes.containsKey(entry.getKey()));
 
-        // Update request count
-        int count = requestCounts.getOrDefault(fingerprint, 0) + 1;
-        requestCounts.put(fingerprint, count);
-        lastRequestTimes.put(fingerprint, now);
+        // Update request count for the specific fingerprint+IP combination
+        int count = requestCounts.getOrDefault(key, 0) + 1;
+        requestCounts.put(key, count);
+        lastRequestTimes.put(key, now);
 
-        return count > maxRequestsPerWindow;
+        boolean isLimited = count > maxRequestsPerWindow;
+        if (isLimited) {
+            log.warn("Rate limit exceeded for IP: {} with fingerprint: {} (count: {})",
+                    clientIp, fingerprint, count);
+        }
+
+        return isLimited;
     }
 
-    private boolean hasTooManyFailedAttempts(String fingerprint) {
-        // Check for null fingerprint
-        if (fingerprint == null) {
-            log.warn("Null fingerprint detected in hasTooManyFailedAttempts");
-            return false; // Không chặn request với fingerprint null
+    private boolean hasTooManyFailedAttempts(String fingerprint, String clientIp) {
+        if (fingerprint == null || clientIp == null) {
+            log.warn("Null fingerprint or IP detected in hasTooManyFailedAttempts");
+            return false;
         }
-        
+
+        String key = fingerprint + ":" + clientIp;
         long now = System.currentTimeMillis();
         long windowStart = now - (failedAttemptWindowSeconds * 1000);
 
-        // Clean up old entries
         lastFailedAttemptTime.entrySet().removeIf(entry -> entry.getValue() < windowStart);
         failedAttempts.entrySet().removeIf(entry -> !lastFailedAttemptTime.containsKey(entry.getKey()));
 
-        return failedAttempts.getOrDefault(fingerprint, 0) >= maxFailedAttempts;
+        return failedAttempts.getOrDefault(key, 0) >= maxFailedAttempts;
     }
 
     private void recordFailedAttempt(String fingerprint) {
@@ -102,108 +108,108 @@ public class TokenService {
             log.warn("Null fingerprint detected in recordFailedAttempt");
             return;
         }
-        
+
         long now = System.currentTimeMillis();
         int attempts = failedAttempts.getOrDefault(fingerprint, 0) + 1;
         failedAttempts.put(fingerprint, attempts);
         lastFailedAttemptTime.put(fingerprint, now);
-        
+
         if (attempts >= maxFailedAttempts) {
             log.warn("Too many failed attempts for fingerprint: {} ({})", fingerprint, attempts);
         }
     }
 
-    public Optional<AppToken> generateTokenIfValid(AppTokenRequestWithComponents request, 
-                                                 String clientIp, 
-                                                 String userAgent,
-                                                 Map<String, Object> fingerprintComponents) {
+    public Optional<AppToken> generateTokenIfValid(AppTokenRequest request,
+                                                   String clientIp,
+                                                   String userAgent) {
         // Handle localhost IPv6
         if ("0:0:0:0:0:0:0:1".equals(clientIp)) {
             clientIp = "127.0.0.1";
             log.debug("Converting localhost IPv6 to IPv4: {}", clientIp);
         }
 
-        log.debug("Validating token request from IP: {}, User-Agent: {}", clientIp, userAgent);
-
         // 0. Check failed attempts
-        if (hasTooManyFailedAttempts(request.getFingerprint())) {
-            log.warn("Too many failed attempts for fingerprint: {}, IP: {}, User-Agent: {}", 
-                request.getFingerprint(), clientIp, userAgent);
+        if (hasTooManyFailedAttempts(request.getFingerprint(), clientIp)) {
+            log.warn("Too many failed attempts for fingerprint: {}, IP: {}, User-Agent: {}",
+                    request.getFingerprint(), clientIp, userAgent);
             logFailedRequest(request, clientIp, userAgent, "Too many failed attempts", false);
             return Optional.empty();
         }
 
-        // 1. Verify fingerprint components
-        if (!fingerprintVerificationService.verifyFingerprint(request.getFingerprint(), fingerprintComponents)) {
-            log.warn("Invalid fingerprint detected - IP: {}, User-Agent: {}, DeviceId: {}, Components: {}", 
-                clientIp, userAgent, request.getDeviceId(), fingerprintComponents);
-            logFailedRequest(request, clientIp, userAgent, "Invalid fingerprint", false);
+        try {
+            // 1. Verify visitor and get token response
+            AppTokenResponse tokenResponse = fingerprintVerificationService.verifyVisitor(request);
+            
+            // 2. Check rate limiting
+            if (isRateLimited(request.getFingerprint(), clientIp)) {
+                log.warn("Rate limit exceeded - IP: {}, Fingerprint: {}, User-Agent: {}, DeviceId: {}",
+                        clientIp, request.getFingerprint(), userAgent, request.getVisitorId());
+                logFailedRequest(request, clientIp, userAgent, "Rate limit exceeded", true);
+                return Optional.empty();
+            }
+
+            // 3. Validate timestamp
+            // Get current server time in Unix epoch seconds
+            long now = Instant.now().getEpochSecond();
+
+            // Check if request timestamp is within acceptable time window
+            // Uses absolute difference to handle both future and past timestamps
+            if (Math.abs(now - request.getTimestamp()) > timestampToleranceSeconds) {
+                log.warn("Invalid timestamp - IP: {}, Request time: {}, Current time: {}, Difference: {} seconds",
+                        clientIp, request.getTimestamp(), now, Math.abs(now - request.getTimestamp()));
+                // Record failed attempt and mark as non-bot (false flag)
+                logFailedRequest(request, clientIp, userAgent, "Invalid timestamp", false);
+                // Return empty result to indicate validation failure
+                return Optional.empty();
+            }
+
+            log.info("Generating token - IP: {}, Fingerprint: {}, DeviceId: {}, User-Agent: {}, Timestamp: {}",
+                    clientIp, request.getFingerprint(), request.getVisitorId(), userAgent, now);
+
+            // 4. Log successful request
+            RequestLog successLog = RequestLog.builder()
+                    .fingerprint(request.getFingerprint())
+                    .deviceId(request.getVisitorId())
+                    .ipAddress(clientIp)
+                    .userAgent(userAgent)
+                    .requestType("TOKEN_REQUEST")
+                    .isSuccess(true)
+                    .timestamp(Instant.now())
+                    .isSuspectedBot(false)
+                    .build();
+            requestLogService.logRequest(successLog);
+
+            // 5. Return token from response
+            return Optional.of(AppToken.builder()
+                    .token(tokenResponse.getToken())
+                    .fingerprint(request.getFingerprint())
+                    .expiresAt(now + tokenExpirationSeconds)
+                    .build());
+
+        } catch (BotDetectedException e) {
+            log.warn("Bot detected for visitor {} - IP: {}, User-Agent: {}", 
+                request.getVisitorId(), clientIp, userAgent);
+            logFailedRequest(request, clientIp, userAgent, "Bot detected", true);
+            return Optional.empty();
+        } catch (Exception e) {
+            log.error("Error generating token for fingerprint: {} - IP: {}, User-Agent: {}, Error: {}",
+                    request.getFingerprint(), clientIp, userAgent, e.getMessage(), e);
+            logFailedRequest(request, clientIp, userAgent, "Verification error", false);
             return Optional.empty();
         }
-
-        // 2. Check rate limiting
-        if (isRateLimited(request.getFingerprint())) {
-            log.warn("Rate limit exceeded - IP: {}, Fingerprint: {}, User-Agent: {}, DeviceId: {}", 
-                clientIp, request.getFingerprint(), userAgent, request.getDeviceId());
-            logFailedRequest(request, clientIp, userAgent, "Rate limit exceeded", true);
-            return Optional.empty();
-        }
-
-        // 3. Validate timestamp
-        long now = Instant.now().getEpochSecond();
-        if (Math.abs(now - request.getTimestamp()) > timestampToleranceSeconds) {
-            log.warn("Invalid timestamp - IP: {}, Request time: {}, Current time: {}, Difference: {} seconds", 
-                clientIp, request.getTimestamp(), now, Math.abs(now - request.getTimestamp()));
-            logFailedRequest(request, clientIp, userAgent, "Invalid timestamp", false);
-            return Optional.empty();
-        }
-
-        log.info("Generating token - IP: {}, Fingerprint: {}, DeviceId: {}, User-Agent: {}, Timestamp: {}", 
-            clientIp, request.getFingerprint(), request.getDeviceId(), userAgent, now);
-
-        // 4. Generate token
-        long expirationTime = now + tokenExpirationSeconds;
-        String token = Jwts.builder()
-                .subject(request.getFingerprint())
-                .expiration(Date.from(Instant.ofEpochSecond(expirationTime)))
-                .issuedAt(Date.from(Instant.ofEpochSecond(now)))
-                .claim("deviceId", request.getDeviceId())
-                .claim("ip", clientIp)
-                .claim("userAgent", userAgent)
-                .signWith(key)
-                .compact();
-
-        // 5. Log successful request
-        RequestLog successLog = RequestLog.builder()
-            .fingerprint(request.getFingerprint())
-            .deviceId(request.getDeviceId())
-            .ipAddress(clientIp)
-            .userAgent(userAgent)
-            .requestType("TOKEN_REQUEST")
-            .isSuccess(true)
-            .timestamp(Instant.now())
-            .isSuspectedBot(false)
-            .build();
-        requestLogService.logRequest(successLog);
-
-        return Optional.of(AppToken.builder()
-                .token(token)
-                .fingerprint(request.getFingerprint())
-                .expiresAt(expirationTime)
-                .build());
     }
 
-    private void logFailedRequest(AppTokenRequestWithComponents request, String clientIp, String userAgent, String reason, boolean isSuspectedBot) {
+    private void logFailedRequest(AppTokenRequest request, String clientIp, String userAgent, String reason, boolean isSuspectedBot) {
         RequestLog failedLog = RequestLog.builder()
-            .fingerprint(request.getFingerprint())
-            .deviceId(request.getDeviceId())
-            .ipAddress(clientIp)
-            .userAgent(userAgent)
-            .requestType("TOKEN_REQUEST")
-            .isSuccess(false)
-            .failureReason(reason)
-            .timestamp(Instant.now())
-            .isSuspectedBot(isSuspectedBot)
+                .fingerprint(request.getFingerprint())
+                .deviceId(request.getVisitorId())
+                .ipAddress(clientIp)
+                .userAgent(userAgent)
+                .requestType("TOKEN_REQUEST")
+                .isSuccess(false)
+                .failureReason(reason)
+                .timestamp(Instant.now())
+                .isSuspectedBot(isSuspectedBot)
                 .build();
         requestLogService.logRequest(failedLog);
     }
@@ -214,42 +220,13 @@ public class TokenService {
             log.warn("Null fingerprint detected in validateToken");
             return false;
         }
-        
+
         try {
             log.debug("Validating token for fingerprint: {}", fingerprint);
-            
-            Claims claims = Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-
-            boolean subjectValid = claims.getSubject().equals(fingerprint);
-            boolean notExpired = claims.getExpiration().after(new Date());
-            
-            if (!subjectValid) {
-                log.warn("Token validation failed - Subject mismatch. Expected: {}, Found: {}", 
-                    fingerprint, claims.getSubject());
-            }
-            
-            if (!notExpired) {
-                log.warn("Token validation failed - Token expired. Expiration: {}, Current time: {}", 
-                    claims.getExpiration(), new Date());
-            }
-
-            boolean isValid = subjectValid && notExpired;
-
-            if (!isValid) {
-                recordFailedAttempt(fingerprint);
-                log.warn("Token validation failed for fingerprint: {}. IP: {}, User-Agent: {}", 
-                    fingerprint, claims.get("ip"), claims.get("userAgent"));
-            } else {
-                log.debug("Token successfully validated for fingerprint: {}", fingerprint);
-            }
-
-            return isValid;
+            return jwtService.validateToken(token) && 
+                   jwtService.getVisitorIdFromToken(token).equals(fingerprint);
         } catch (Exception e) {
-            log.error("Token validation error for fingerprint: {}: {}", fingerprint, e.getMessage());
+            log.error("Token validation error for fingerprint: {}: {}", fingerprint, token, e);
             recordFailedAttempt(fingerprint);
             return false;
         }

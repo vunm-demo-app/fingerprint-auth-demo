@@ -23,7 +23,7 @@ public class StockPriceController {
             @RequestHeader("X-Fingerprint") String fingerprint,
             @RequestHeader("X-App-Token") String token) {
         
-        log.info("Received request for all stock prices. Fingerprint: {}", fingerprint);
+        log.debug("Received request for all stock prices. Fingerprint: {}", fingerprint);
         
         if (!tokenService.validateToken(token, fingerprint)) {
             log.warn("Invalid token for fingerprint: {}", fingerprint);
@@ -31,7 +31,7 @@ public class StockPriceController {
         }
 
         List<StockPrice> prices = stockPriceService.getAllStockPrices();
-        log.info("Returning {} stock prices", prices.size());
+        log.debug("Returning {} stock prices", prices.size());
         return ResponseEntity.ok(prices);
     }
 
