@@ -1,11 +1,8 @@
 import axios from 'axios';
-import FingerprintJS from '@fingerprintjs/fingerprintjs-pro';
 import SHA256 from 'crypto-js/sha256';
 
 // Use a mutable reference for the FingerprintJS promise
-let fpPromiseRef = FingerprintJS.load({ 
-  apiKey: import.meta.env.VITE_FINGERPRINT_PUBLIC_API_KEY || 'zThPOeeB10e17zhjQbbh'
-});
+let fpPromiseRef: Promise<any> | null = null;
 
 interface AppToken {
     token: string;
@@ -162,7 +159,7 @@ export class ApiService {
 
     protected async getFingerprint(): Promise<{ visitorId: string, requestId: string, components: Record<string, any> }> {
         // Always get fresh requestId from Fingerprint
-        const fp = await fpPromiseRef;
+        const fp = await ApiServiceWithPublicMethods.getFingerprintPromise();
         this.fpResult = await fp.get() as ExtendedGetResult;
         
         // Get fresh requestId
@@ -340,6 +337,13 @@ export class ApiService {
 export class ApiServiceWithPublicMethods extends ApiService {
     public static setFingerprintPromise(promise: Promise<any>) {
         fpPromiseRef = promise;
+    }
+
+    public static getFingerprintPromise(): Promise<any> {
+        if (!fpPromiseRef) {
+            throw new Error('FingerprintJS promise not initialized. Call setFingerprintPromise first.');
+        }
+        return fpPromiseRef;
     }
 }
 
