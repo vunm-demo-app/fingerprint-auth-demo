@@ -2,6 +2,152 @@
 
 Ứng dụng demo xác thực thiết bị sử dụng FingerprintJS Pro.
 
+## Flow Xác Thực
+
+### 1. Flow Tạo Token
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Frontend
+    participant Backend
+    participant FingerprintSDK
+    participant FingerprintServer
+
+    Client->>Frontend: Truy cập trang web
+    Note over Frontend: Khởi tạo FingerprintJS SDK
+    Frontend->>FingerprintSDK: FingerprintJS.load()
+    FingerprintSDK->>FingerprintServer: API call để lấy visitorId
+    FingerprintServer-->>FingerprintSDK: Trả về visitorId và requestId
+    FingerprintSDK-->>Frontend: Trả về kết quả qua SDK
+    Note over Frontend: Lưu visitorId làm fingerprint
+    Frontend->>Backend: POST /api/tokens
+    Note over Frontend,Backend: Gửi kèm:
+    Note over Frontend,Backend: - visitorId (fingerprint)
+    Note over Frontend,Backend: - requestId (để verify)
+    Note over Frontend,Backend: - timestamp
+    Note over Frontend,Backend: - components
+    Backend->>FingerprintServer: API call verify visitor
+    Note over Backend,FingerprintServer: Gửi requestId để xác thực
+    FingerprintServer-->>Backend: Kết quả xác thực
+    Backend->>Backend: Kiểm tra bot detection
+    Backend->>Backend: Tạo JWT token
+    Note over Backend: Token chứa:
+    Note over Backend: - visitorId (fingerprint)
+    Note over Backend: - requestId
+    Note over Backend: - timestamp
+    Backend-->>Frontend: Trả về token
+    Frontend->>Frontend: Lưu token vào localStorage
+```
+
+### 2. Flow Bảo Vệ API
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Frontend
+    participant Backend
+    participant FingerprintSDK
+    participant FingerprintServer
+
+    Client->>Frontend: Gọi API (ví dụ: /api/stocks)
+    Frontend->>Frontend: Lấy token từ localStorage
+    Note over Frontend: Sử dụng FingerprintJS SDK
+    Frontend->>FingerprintSDK: fp.get()
+    FingerprintSDK->>FingerprintServer: API call để lấy requestId mới
+    FingerprintServer-->>FingerprintSDK: Trả về requestId
+    FingerprintSDK-->>Frontend: Trả về kết quả qua SDK
+    Frontend->>Backend: Gửi request với token và requestId
+    Note over Frontend,Backend: Headers:
+    Note over Frontend,Backend: - X-App-Token: JWT token
+    Note over Frontend,Backend: - X-Fingerprint: visitorId
+    Note over Frontend,Backend: - X-Request-Id: requestId mới
+    Backend->>Backend: Validate JWT token
+    Note over Backend: Kiểm tra:
+    Note over Backend: - Signature và expiration
+    Note over Backend: - visitorId trong token
+    Backend->>FingerprintServer: API call verify requestId
+    Note over Backend,FingerprintServer: Gửi requestId để xác thực
+    FingerprintServer-->>Backend: Kết quả verify
+    alt Token và requestId hợp lệ
+        Backend-->>Frontend: Trả về dữ liệu
+        Frontend-->>Client: Hiển thị dữ liệu
+    else Token hoặc requestId không hợp lệ
+        Backend-->>Frontend: 401 Unauthorized
+        Frontend->>Frontend: Xóa token cũ
+        Frontend->>Frontend: Chuyển về trang login
+    end
+```
+
+### 3. Flow Chống Bot và Tái Sử Dụng RequestId
+
+```mermaid
+sequenceDiagram
+    participant Bot
+    participant Backend
+    participant FingerprintServer
+    participant RealClient
+
+    Note over Bot: Cố gắng tấn công bằng cách:
+    Note over Bot: 1. Copy requestId từ request hợp lệ
+    Note over Bot: 2. Sử dụng bot để tự động hóa request
+
+    Bot->>Backend: Gửi request với requestId đã copy
+    Note over Bot,Backend: Headers:
+    Note over Bot,Backend: - X-App-Token: JWT token giả mạo
+    Note over Bot,Backend: - X-Fingerprint: visitorId giả mạo
+    Note over Bot,Backend: - X-Request-Id: requestId đã copy
+    Backend->>FingerprintServer: Verify requestId
+    Note over Backend,FingerprintServer: Kiểm tra:
+    Note over Backend,FingerprintServer: 1. requestId đã được sử dụng
+    Note over Backend,FingerprintServer: 2. Dấu hiệu bot (tốc độ request, pattern)
+    Note over Backend,FingerprintServer: 3. Không khớp với visitorId
+    FingerprintServer-->>Backend: Phát hiện bất thường
+    Backend-->>Bot: 401 Unauthorized
+    Note over Backend: Ghi log và chặn IP
+
+    RealClient->>Backend: Request hợp lệ
+    Backend->>FingerprintServer: Verify requestId mới
+    FingerprintServer-->>Backend: Xác thực thành công
+    Backend-->>RealClient: Trả về dữ liệu
+```
+
+## Cấu hình FingerprintJS
+
+### Frontend (SDK)
+```typescript
+// Khởi tạo SDK
+const fpPromise = FingerprintJS.load({
+  apiKey: 'your-api-key',
+  endpoint: 'https://api.fpjs.io', // hoặc proxy endpoint
+  region: 'ap'
+});
+
+// Sử dụng SDK
+const fp = await fpPromise;
+const result = await fp.get();
+// result.visitorId: định danh thiết bị
+// result.requestId: mã xác thực request
+```
+
+### Backend (API)
+```java
+// Cấu hình trong application.properties
+fingerprint.api.key=your-api-key
+fingerprint.api.url=https://api.fpjs.io
+fingerprint.api.region=ap
+
+// Sử dụng API để verify
+@PostMapping("/verify")
+public ResponseEntity<?> verifyVisitor(
+    @RequestParam String requestId,
+    @RequestParam String visitorId
+) {
+    // Gọi API của Fingerprint Server để verify
+    // Trả về kết quả xác thực
+}
+```
+
 ## Tính năng
 
 - Xác thực thiết bị thông qua FingerprintJS Pro

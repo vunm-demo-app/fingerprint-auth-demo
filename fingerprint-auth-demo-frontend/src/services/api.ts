@@ -76,7 +76,6 @@ const api = axios.create({
 export class ApiService {
     private token: AppToken | null = null;
     private fingerprint: string | null = null;
-    private visitorId: string | null = null;
     private fingerprintComponents: Record<string, any> | null = null;
     private initPromise: Promise<void> | null = null;
     private fpResult: ExtendedGetResult | null = null;
@@ -148,25 +147,11 @@ export class ApiService {
 
             const response = await api.post<AppToken>('/app-token', request);
             this.token = response.data;
-            this.visitorId = visitorId;
             console.log('Token response:', this.token);
         } catch (error) {
             console.error('Failed to initialize ApiService:', error);
             throw error;
         }
-    }
-
-    private generateDeviceId(): string {
-        if (!this.visitorId) {
-            const storedDeviceId = localStorage.getItem('deviceId');
-            if (storedDeviceId) {
-                this.visitorId = storedDeviceId;
-            } else {
-                this.visitorId = 'web-' + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem('deviceId', this.visitorId);
-            }
-        }
-        return this.visitorId;
     }
 
     private hashComponent(component: any): string {
@@ -298,7 +283,6 @@ export class ApiService {
 
             const response = await api.post<AppToken>('/app-token', request);
             this.token = response.data;
-            this.visitorId = visitorId;
             console.log('Token refresh response:', this.token);
         }
     }

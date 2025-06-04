@@ -7,7 +7,8 @@ const StockTable: React.FC = () => {
     const [data, setData] = useState<StockPrice[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [consecutive401Count, setConsecutive401Count] = useState(0);
+    // Use ref instead of state since we only need to track the count internally
+    const consecutive401CountRef = useRef(0);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     const getPriceColor = (price: number, refPrice: number) => {
@@ -118,18 +119,15 @@ const StockTable: React.FC = () => {
                 const stocks = await apiService.getAllStocks();
                 if (!isUnmounted) {
                     setData(stocks);
-                    setConsecutive401Count(0); // Reset on success
+                    consecutive401CountRef.current = 0; // Reset on success
                 }
             } catch (err: any) {
                 if (err?.response?.status === 401) {
-                    setConsecutive401Count(prev => {
-                        const next = prev + 1;
-                        if (next >= 5 && intervalRef.current) {
-                            clearInterval(intervalRef.current);
-                            intervalRef.current = null;
-                        }
-                        return next;
-                    });
+                    consecutive401CountRef.current += 1;
+                    if (consecutive401CountRef.current >= 5 && intervalRef.current) {
+                        clearInterval(intervalRef.current);
+                        intervalRef.current = null;
+                    }
                     setError('Unauthorized (401): Đã dừng tự động làm mới sau 5 lần lỗi.');
                 } else {
                     setError(err instanceof Error ? err.message : 'Failed to fetch data');
