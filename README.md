@@ -62,20 +62,19 @@ sequenceDiagram
     Note over Frontend,Backend: - X-App-Token: JWT token
     Note over Frontend,Backend: - X-Fingerprint: visitorId
     Note over Frontend,Backend: - X-Request-Id: requestId mới
-    Backend->>Backend: Validate JWT token
-    Note over Backend: Kiểm tra:
-    Note over Backend: - Signature và expiration
-    Note over Backend: - visitorId trong token
-    Backend->>FingerprintServer: API call verify requestId
-    Note over Backend,FingerprintServer: Gửi requestId để xác thực
-    FingerprintServer-->>Backend: Kết quả verify
-    alt Token và requestId hợp lệ
-        Backend-->>Frontend: Trả về dữ liệu
-        Frontend-->>Client: Hiển thị dữ liệu
-    else Token hoặc requestId không hợp lệ
+    Backend->>Backend: Kiểm tra requestId đã sử dụng
+    alt requestId đã sử dụng
         Backend-->>Frontend: 401 Unauthorized
-        Frontend->>Frontend: Xóa token cũ
-        Frontend->>Frontend: Chuyển về trang login
+        Note over Backend: Ghi log và chặn IP
+    else requestId chưa sử dụng
+        Backend->>FingerprintServer: Verify requestId
+        FingerprintServer-->>Backend: Kết quả verify
+        alt Verify thành công
+            Backend->>Backend: Lưu requestId đã sử dụng
+            Backend-->>Frontend: Trả về dữ liệu
+        else Verify thất bại
+            Backend-->>Frontend: 401 Unauthorized
+        end
     end
 ```
 
@@ -83,33 +82,83 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Bot
+    participant Attacker
     participant Backend
     participant FingerprintServer
     participant RealClient
 
-    Note over Bot: Cố gắng tấn công bằng cách:
-    Note over Bot: 1. Copy requestId từ request hợp lệ
-    Note over Bot: 2. Sử dụng bot để tự động hóa request
+    Note over Attacker: Cố gắng tấn công bằng cách:
+    Note over Attacker: 1. Copy requestId từ request hợp lệ
+    Note over Attacker: 2. Sử dụng lại requestId để tạo token mới
 
-    Bot->>Backend: Gửi request với requestId đã copy
-    Note over Bot,Backend: Headers:
-    Note over Bot,Backend: - X-App-Token: JWT token giả mạo
-    Note over Bot,Backend: - X-Fingerprint: visitorId giả mạo
-    Note over Bot,Backend: - X-Request-Id: requestId đã copy
-    Backend->>FingerprintServer: Verify requestId
-    Note over Backend,FingerprintServer: Kiểm tra:
-    Note over Backend,FingerprintServer: 1. requestId đã được sử dụng
-    Note over Backend,FingerprintServer: 2. Dấu hiệu bot (tốc độ request, pattern)
-    Note over Backend,FingerprintServer: 3. Không khớp với visitorId
-    FingerprintServer-->>Backend: Phát hiện bất thường
-    Backend-->>Bot: 401 Unauthorized
+    Attacker->>Backend: Gửi request với requestId đã copy
+    Note over Attacker,Backend: Headers:
+    Note over Attacker,Backend: - X-App-Token: JWT token giả mạo
+    Note over Attacker,Backend: - X-Fingerprint: visitorId giả mạo
+    Note over Attacker,Backend: - X-Request-Id: requestId đã copy
+    Backend->>Backend: Kiểm tra requestId đã sử dụng
+    Note over Backend: requestId đã được dùng để tạo token trước đó
+    Backend-->>Attacker: 401 Unauthorized
     Note over Backend: Ghi log và chặn IP
 
-    RealClient->>Backend: Request hợp lệ
-    Backend->>FingerprintServer: Verify requestId mới
+    RealClient->>Backend: Request hợp lệ với requestId mới
+    Backend->>Backend: Kiểm tra requestId chưa sử dụng
+    Note over Backend: requestId hợp lệ và chưa được sử dụng
+    Backend->>FingerprintServer: Verify requestId
     FingerprintServer-->>Backend: Xác thực thành công
-    Backend-->>RealClient: Trả về dữ liệu
+    Backend->>Backend: Lưu requestId đã sử dụng
+    Backend-->>RealClient: Tạo token thành công
+```
+
+### 4. Flow Phân Tích Lỗ Hổng và Cách Bảo Vệ
+
+```mermaid
+sequenceDiagram
+    participant Attacker
+    participant Postman
+    participant Backend
+    participant FingerprintServer
+    participant RealBrowser
+
+    Note over Attacker: Phân tích request từ browser:
+    Note over Attacker: 1. Copy toàn bộ headers
+    Note over Attacker: 2. Copy requestId
+    Note over Attacker: 3. Copy JWT token
+    Note over Attacker: 4. Copy visitorId
+
+    Attacker->>Postman: Tạo request mới
+    Note over Attacker,Postman: Headers giống hệt:
+    Note over Attacker,Postman: - X-App-Token: JWT token đã copy
+    Note over Attacker,Postman: - X-Fingerprint: visitorId đã copy
+    Note over Attacker,Postman: - X-Request-Id: requestId đã copy
+    Postman->>Backend: Gửi request
+    Backend->>FingerprintServer: Verify requestId
+    Note over Backend,FingerprintServer: Vấn đề:
+    Note over Backend,FingerprintServer: 1. requestId vẫn còn hiệu lực
+    Note over Backend,FingerprintServer: 2. Không có thông tin browser
+    Note over Backend,FingerprintServer: 3. Không có components thật
+    FingerprintServer-->>Backend: Verify thành công
+    Note over Backend: Lỗ hổng bảo mật!
+    Backend-->>Postman: 200 OK
+
+    Note over RealBrowser: Cách bảo vệ đúng:
+    Note over RealBrowser: 1. Luôn yêu cầu components mới
+    Note over RealBrowser: 2. Verify browser environment
+    Note over RealBrowser: 3. Kiểm tra tính nhất quán
+    Note over RealBrowser: 4. Sử dụng proxy endpoint
+
+    RealBrowser->>Backend: Request hợp lệ
+    Note over RealBrowser,Backend: Headers:
+    Note over RealBrowser,Backend: - Components mới từ SDK
+    Note over RealBrowser,Backend: - Browser environment
+    Note over RealBrowser,Backend: - requestId mới
+    Backend->>FingerprintServer: Verify với components
+    Note over Backend,FingerprintServer: Kiểm tra:
+    Note over Backend,FingerprintServer: 1. Components có hợp lệ
+    Note over Backend,FingerprintServer: 2. Browser environment
+    Note over Backend,FingerprintServer: 3. Tính nhất quán
+    FingerprintServer-->>Backend: Xác thực thành công
+    Backend-->>RealBrowser: Trả về dữ liệu
 ```
 
 ## Cấu hình FingerprintJS
@@ -268,13 +317,9 @@ app.token.timestamp.tolerance=120
   - Rate limiting để tránh quá tải
   - Theo dõi và chặn các nỗ lực xác thực thất bại
   - Ghi log chi tiết cho các sự kiện bảo mật
-
-- Cấu hình bảo mật:
-  - API key được lưu trong biến môi trường
-  - Hỗ trợ proxy để bảo vệ API key
-  - Token expiration và timestamp validation
-  - CORS được cấu hình chặt chẽ
-  - Xử lý lỗi 401 và auto-refresh thông minh
+  - **Mỗi requestId chỉ được sử dụng một lần để tạo token**
+  - **Lưu trữ và kiểm tra các requestId đã sử dụng**
+  - **Tự động chặn các request sử dụng requestId đã dùng**
 
 ## Giấy phép
 
